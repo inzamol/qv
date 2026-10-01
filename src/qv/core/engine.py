@@ -8,6 +8,7 @@ from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
 from qv.analyzers.environment.drift import EnvironmentAnalyzer
 from qv.analyzers.imports.analyzer import ImportAnalyzer
 from qv.analyzers.packaging.analyzer import PackagingAnalyzer
+from qv.analyzers.security.analyzer import SecurityAnalyzer
 from qv.core.analyzer import Analyzer
 from qv.core.config import QvConfig
 from qv.core.context import ProjectContext
@@ -31,6 +32,7 @@ class AnalysisEngine:
                 EnvironmentAnalyzer(),
                 DependencyAnalyzer(),
                 ImportAnalyzer(),
+                SecurityAnalyzer(),
             ]
 
     def run(self, context: ProjectContext) -> ScanResult:

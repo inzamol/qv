@@ -59,6 +59,9 @@ def cli() -> None:
 @click.option(
     "--output", "-o", type=click.Path(dir_okay=False, path_type=Path), help="Write output to file."
 )
+@click.option(
+    "--offline", is_flag=True, help="Disable remote vulnerability/CVE queries (airgapped mode)."
+)
 def scan(
     path: Path,
     strict: bool,
@@ -66,6 +69,7 @@ def scan(
     as_json: bool,
     as_sarif: bool,
     output: Path | None,
+    offline: bool,
 ) -> None:
     """Scan a Python project and report health findings."""
     try:
@@ -73,6 +77,8 @@ def scan(
         config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
         if strict or ci_mode:
             config.strict = True
+        if offline:
+            config.offline = True
 
         discovery = ProjectDiscovery(root=path, config=config)
         context = discovery.discover_context()

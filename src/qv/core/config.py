@@ -53,6 +53,7 @@ class QvConfig:
     paths: PathConfig = field(default_factory=PathConfig)
     target_python: str | None = None
     strict: bool = False
+    offline: bool = False
 
     def is_rule_enabled(self, rule_id: str) -> bool:
         if rule_id in self.ignored_rules:
@@ -109,12 +110,14 @@ class QvConfig:
 
         runtime_dict = tool_config.get("runtime", {})
         target_python = runtime_dict.get("python") or data.get("project", {}).get("requires-python")
+        offline = bool(tool_config.get("offline", False))
 
         return cls(
             rules=rules,
             ignored_rules=ignored_rules,
             paths=paths,
             target_python=target_python,
+            offline=offline,
         )
 
 

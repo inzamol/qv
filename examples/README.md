@@ -16,6 +16,7 @@ This directory contains standalone example projects demonstrating all diagnostic
 | **[`environment_drift/`](./environment_drift)** | `ENV-002`, `ENV-003` | Environment | Target Python is `>=3.12`, but Dockerfile uses `3.10` and CI matrix runs `3.9`. | ℹ️ Docker/CI Config |
 | **[`dead_modules/`](./dead_modules)** | `IMP-003` | Architecture | `unused_legacy_module.py` exists in source code but is never imported anywhere. | ℹ️ Dead Code Removal |
 | **[`deprecated_stdlib/`](./deprecated_stdlib)** | `IMP-004` | Compatibility | Code imports removed stdlib modules (`imp`, `distutils`, `cgi`, `pipes` in Python 3.12/3.13). | ℹ️ Modernization |
+| **[`vulnerable_dependencies/`](./vulnerable_dependencies)** | `DEP-006` | Security | Project pins `jinja2==2.11.2` with known critical security vulnerabilities & CVEs. | ℹ️ Security Upgrade |
 | **[`all_in_one_unhealthy/`](./all_in_one_unhealthy)** | Multiple | All | Realistic messy project containing missing deps, unused deps, circular imports, and container drift. | ✅ Yes |
 
 ---
@@ -82,7 +83,16 @@ qv scan examples/dead_modules
 qv scan examples/deprecated_stdlib
 ```
 
-### 9. Test All-in-One Unhealthy Project
+### 9. Test Vulnerable Dependencies & CVEs (`DEP-006`)
+```bash
+# Scan and query live OSV.dev advisory database for CVEs
+qv scan examples/vulnerable_dependencies
+
+# Scan in offline airgapped mode
+qv scan examples/vulnerable_dependencies --offline
+```
+
+### 10. Test All-in-One Unhealthy Project
 ```bash
 # Full health report across all subsystems
 qv scan examples/all_in_one_unhealthy

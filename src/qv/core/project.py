@@ -276,7 +276,10 @@ class ProjectDiscovery:
             imports=tuple(imports),
             docker=docker_config,
             ci=ci_config,
-            config={"target_python": target_python} if target_python else {},
+            config={
+                "target_python": target_python,
+                "offline": self.config.offline,
+            },
         )
 
     def _discover_docker(self) -> DockerConfig:

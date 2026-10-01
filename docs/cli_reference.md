@@ -35,6 +35,7 @@ qv scan [PATH] [OPTIONS]
 | `--ci` | Runs non-interactively with strict mode enabled |
 | `--json` | Emits scan results as structured JSON |
 | `--sarif` | Emits scan results as standard SARIF v2.1.0 format |
+| `--offline` | Disables remote vulnerability/CVE queries (airgapped mode) |
 | `--output`, `-o <FILE>` | Writes output directly to a file |
 
 ### Exit Codes

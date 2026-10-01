@@ -116,3 +116,43 @@ def test_deprecated_stdlib_example():
     assert "IMP-004" in rule_ids
     assert any("distutils" in d.message for d in result.diagnostics)
     assert any("imp" in d.message for d in result.diagnostics)
+
+
+def test_vulnerable_dependencies_example():
+    root = Path(__file__).parent.parent / "examples" / "vulnerable_dependencies"
+    config = QvConfig()
+    context = ProjectDiscovery(root=root, config=config).discover_context()
+
+    # Provide mock osv client or run live if online
+    from unittest.mock import MagicMock
+
+    from qv.analyzers.security.analyzer import SecurityAnalyzer
+    from qv.analyzers.security.osv_client import Vulnerability
+
+    mock_osv = MagicMock()
+    mock_osv.query_packages.return_value = {
+        ("jinja2", "2.11.2"): [
+            Vulnerability(
+                id="GHSA-j7hp-h8jx-5ppr",
+                package_name="jinja2",
+                installed_version="2.11.2",
+                summary="Jinja2 HTML injection vulnerability",
+                details="Details",
+                aliases=("CVE-2024-22195",),
+                fixed_versions=("3.1.3",),
+                advisory_url="https://github.com/advisories/GHSA-j7hp-h8jx-5ppr",
+            )
+        ]
+    }
+
+    engine = AnalysisEngine(
+        config=config,
+        analyzers=[SecurityAnalyzer(osv_client=mock_osv)],
+    )
+    result = engine.run(context)
+
+    rule_ids = [d.id for d in result.diagnostics]
+    assert "DEP-006" in rule_ids
+    vuln_diag = next(d for d in result.diagnostics if d.id == "DEP-006")
+    assert "jinja2" in vuln_diag.affected_packages
+    assert "GHSA-j7hp-h8jx-5ppr" in vuln_diag.title
