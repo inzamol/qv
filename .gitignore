@@ -56,6 +56,9 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Documentation builds
+site/
+
 # Internal developer design docs
 dev_docs/
 

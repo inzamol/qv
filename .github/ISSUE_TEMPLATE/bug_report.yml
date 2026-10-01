@@ -1,0 +1,73 @@
+name: 🐛 Bug Report
+description: Report unexpected behavior, inaccurate diagnostics, or crashes in qv.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please search existing issues before filing a duplicate.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the problem...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Provide the command and minimal project layout to reproduce the issue.
+      placeholder: |
+        1. Run `qv scan` on a project with ...
+        2. Expected output: ...
+        3. Actual output: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: command_output
+    attributes:
+      label: Command Output / Error Trace
+      description: Paste the output of `qv scan` or stack trace here.
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: package_manager
+    attributes:
+      label: Package Manager
+      description: Which package manager was used in the scanned project?
+      options:
+        - uv
+        - poetry
+        - pip / requirements.txt
+        - pdm
+        - pipenv
+        - Other / None
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment & Versions
+      description: Output of `qv version`, Python version, and OS.
+      placeholder: qv v0.1.0, Python 3.12.7, Ubuntu 24.04 / Windows 11 / macOS 14
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checkboxes
+    attributes:
+      label: Checklist
+      options:
+        - label: I have verified this is not a duplicate of an existing issue.
+          required: true
+        - label: I can reproduce this on the latest version of `qv`.
+          required: true

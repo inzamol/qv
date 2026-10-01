@@ -1,0 +1,56 @@
+name: 📋 New Diagnostic Rule Proposal
+description: Propose a new diagnostic check, code smell detection, or ecosystem drift rule.
+title: "[Rule Proposal]: "
+labels: ["rules", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Diagnostic rules in `qv` detect real ecosystem friction, configuration bugs, or runtime hazards.
+
+  - type: input
+    id: suggested_rule_id
+    attributes:
+      label: Proposed Rule Category & ID
+      description: e.g. `DEP-xxx` (Dependencies), `ENV-xxx` (Environment), `IMP-xxx` (Imports), `PKG-xxx` (Packaging)
+      placeholder: DEP-007
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Rule Summary & Objective
+      description: What specific condition or bug does this rule identify?
+      placeholder: Detect when a requirement in pyproject.toml has an unpinned upper bound...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Default Severity
+      options:
+        - ERROR (Blocking hazard or broken project)
+        - WARNING (Sub-optimal or risky configuration)
+        - INFO (Advisory metric)
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Deterministic Evidence Sources
+      description: Where does the evidence come from without making external network calls?
+      placeholder: AST import nodes, pyproject.toml table parsing, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: remediation
+    attributes:
+      label: Remediation Strategy & Fix
+      description: What actionable command or edit will resolve the issue?
+      placeholder: Run `uv add ...` or update the manifest table.
+    validations:
+      required: true

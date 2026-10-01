@@ -1,0 +1,68 @@
+site_name: qv
+site_description: Diagnose why your Python project is unhealthy — understand the root cause and get safe, actionable fixes.
+site_author: Inzamul Hoque
+site_url: https://qv.readthedocs.io/
+repo_url: https://github.com/inzamol/qv
+repo_name: inzamol/qv
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: cyan
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: cyan
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+
+nav:
+  - Overview: index.md
+  - Getting Started: getting_started.md
+  - Features:
+      - Interactive TUI Explorer: tui.md
+      - HTML Report Dashboard: html_report.md
+      - Safe Automated Fixes: remediation.md
+      - Dependency & Import Tree: tree.md
+  - Reference:
+      - CLI Commands Reference: cli_reference.md
+      - Diagnostic Rules Catalog: rules.md
+      - Configuration Guide: configuration.md
+  - Integration:
+      - CI/CD & GitHub Actions: ci_integration.md
+      - Pre-commit Hooks: pre_commit.md
+  - Community:
+      - Contributing Guide: contributing.md

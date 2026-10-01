@@ -1,0 +1,43 @@
+name: 💡 Feature Request
+description: Suggest a new capability, visualizer, reporter, or CLI option for qv.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make `qv` better? Tell us about your proposal!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: Is your feature request related to a specific pain point or workflow limitation?
+      placeholder: I'm always frustrated when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution or new command/flag you'd like to see.
+      placeholder: Add a `--watch` flag to `qv scan` that...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Considered Alternatives
+      description: Describe any alternative solutions or workarounds you've evaluated.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: willingness
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be interested in submitting a Pull Request to implement this.
+          required: false

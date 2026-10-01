@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Run Test Suite (Pre-flight)
+    name: Run Pre-Flight Quality & Test Suite
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -42,23 +42,26 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: uv sync --all-extras --dev
+      - name: Install all dependencies
+        run: uv sync --all-extras
 
-      - name: Lint and type check
+      - name: Lint and formatting checks
         run: |
           uv run ruff check .
           uv run ruff format --check .
 
-      - name: Run test suite
-        run: uv run pytest --cov=qv --cov-report=term-missing
+      - name: Static type checking
+        run: uv run pyright
+
+      - name: Run test suite with coverage
+        run: uv run pytest --cov=src/qv --cov-report=term-missing
 
   build:
     name: Build & Verify Distributions
     needs: [validate]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
       attestations: write
 
@@ -87,6 +90,12 @@ jobs:
           name: python-package-distributions
           path: dist/
           if-no-files-found: error
+
+      - name: Upload distribution assets to GitHub Release
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
 
   publish-to-pypi:
     name: Publish to PyPI

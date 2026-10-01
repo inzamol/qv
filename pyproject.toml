@@ -35,7 +35,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/inzamol/qv"
 Repository = "https://github.com/inzamol/qv"
-Documentation = "https://github.com/inzamol/qv#readme"
+Documentation = "https://qv.readthedocs.io/"
 Issues = "https://github.com/inzamol/qv/issues"
 
 [project.optional-dependencies]
@@ -46,6 +46,10 @@ dev = [
     "pyright>=1.1.350",
     "tox>=4.15.0",
     "tox-uv>=1.7.0",
+]
+docs = [
+    "mkdocs-material>=9.5.0",
+    "pymdown-extensions>=10.7.0",
 ]
 
 [project.scripts]
