@@ -13,6 +13,7 @@ from qv.core.analyzer import Analyzer
 from qv.core.config import QvConfig
 from qv.core.context import ProjectContext
 from qv.core.models import Diagnostic, RootCause, ScanResult, Suggestion
+from qv.frameworks.fastapi import FastApiAnalyzer
 
 
 class AnalysisEngine:
@@ -33,6 +34,7 @@ class AnalysisEngine:
                 DependencyAnalyzer(),
                 ImportAnalyzer(),
                 SecurityAnalyzer(),
+                FastApiAnalyzer(),
             ]
 
     def run(self, context: ProjectContext) -> ScanResult:

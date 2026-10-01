@@ -156,3 +156,20 @@ def test_vulnerable_dependencies_example():
     vuln_diag = next(d for d in result.diagnostics if d.id == "DEP-006")
     assert "jinja2" in vuln_diag.affected_packages
     assert "GHSA-j7hp-h8jx-5ppr" in vuln_diag.title
+
+
+def test_fastapi_issues_example():
+    root = Path(__file__).parent.parent / "examples" / "fastapi_issues"
+    config = QvConfig()
+    context = ProjectDiscovery(root=root, config=config).discover_context()
+    result = AnalysisEngine(config=config).run(context)
+
+    rule_ids = {d.id for d in result.diagnostics}
+    assert "FAP-001" in rule_ids
+    assert "FAP-002" in rule_ids
+    assert "FAP-003" in rule_ids
+    assert "FAP-004" in rule_ids
+    assert "FAP-005" in rule_ids
+    assert "FAP-006" in rule_ids
+    assert "FAP-007" in rule_ids
+    assert "FAP-008" in rule_ids

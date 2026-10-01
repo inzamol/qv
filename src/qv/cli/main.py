@@ -18,6 +18,7 @@ from qv.core.config import QvConfig
 from qv.core.engine import AnalysisEngine
 from qv.core.models import Severity
 from qv.core.project import ProjectDiscovery
+from qv.frameworks import AVAILABLE_FRAMEWORK_ANALYZERS
 from qv.remediation.engine import RemediationEngine
 from qv.reporters.github_annotator import GitHubAnnotator
 from qv.reporters.html_reporter import HtmlReporter
@@ -274,6 +275,65 @@ def architecture_cmd(path: Path) -> None:
     result = engine.run(context)
     TerminalReporter(console=console).print_result(result)
     sys.exit(1 if result.has_blocking_errors else 0)
+
+
+@cli.command("framework")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--name",
+    "-n",
+    "framework_name",
+    type=click.Choice(["fastapi", "all"], case_sensitive=False),
+    default="all",
+    help="Filter scan to a specific framework (e.g. fastapi).",
+)
+def framework_cmd(path: Path, framework_name: str) -> None:
+    """Run framework-specific diagnostic checks (FastAPI, etc.)."""
+    try:
+        pyproject_path = path / "pyproject.toml"
+        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
+        discovery = ProjectDiscovery(root=path, config=config)
+        context = discovery.discover_context()
+
+        analyzers = [cls() for cls in AVAILABLE_FRAMEWORK_ANALYZERS]
+        if framework_name != "all":
+            analyzers = [a for a in analyzers if a.id.lower() == framework_name.lower()]
+
+        engine = AnalysisEngine(analyzers=analyzers, config=config)
+        result = engine.run(context)
+        TerminalReporter(console=console).print_result(result)
+        sys.exit(1 if result.has_blocking_errors else 0)
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Framework analysis failed:[/bold red] {e}")
+        sys.exit(3)
+
+
+@cli.command("frameworks")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--name",
+    "-n",
+    "framework_name",
+    type=click.Choice(["fastapi", "all"], case_sensitive=False),
+    default="all",
+    help="Filter scan to a specific framework.",
+)
+@click.pass_context
+def frameworks_cmd(ctx: click.Context, path: Path, framework_name: str) -> None:
+    """Alias for 'qv framework' command."""
+    ctx.invoke(framework_cmd, path=path, framework_name=framework_name)
 
 
 @cli.command("fix")

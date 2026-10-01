@@ -194,3 +194,23 @@ Scans source code for circular imports and unresolved internal modules.
 ```bash
 qv architecture [PATH]
 ```
+
+### 8.4 `qv framework` (alias: `qv frameworks`)
+Runs framework-specific diagnostic rules (e.g. FastAPI blocking calls, insecure CORS, missing response models/timeouts).
+
+```bash
+qv framework [PATH] [OPTIONS]
+```
+
+Options:
+- `-n, --name [fastapi|all]`: Filter analysis to a specific framework (default: `all`).
+
+Example:
+```bash
+# Scan current project for all framework issues
+qv framework
+
+# Scan specifically for FastAPI issues
+qv framework --name fastapi
+```
+

@@ -61,3 +61,53 @@ dependencies = []
     result = runner.invoke(cli, ["scan", str(tmp_path), "--sarif"])
     assert result.exit_code in (0, 1)
     assert '"version": "2.1.0"' in result.output
+
+
+def test_cli_framework_command(tmp_path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """
+[project]
+name = "fastapi-sample"
+version = "0.1.0"
+dependencies = ["fastapi"]
+""",
+        encoding="utf-8",
+    )
+    app_file = tmp_path / "app.py"
+    app_file.write_text(
+        """
+import time
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/slow")
+async def slow_route():
+    time.sleep(1)
+    return {"status": "ok"}
+""",
+        encoding="utf-8",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["framework", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "FAP-001" in result.output
+    assert "Blocking call" in result.output
+
+
+def test_cli_frameworks_alias(tmp_path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """
+[project]
+name = "clean-sample"
+version = "0.1.0"
+dependencies = []
+""",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["frameworks", str(tmp_path), "--name", "fastapi"])
+    assert result.exit_code == 0
