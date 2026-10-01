@@ -6,17 +6,17 @@
 
 ## Installation
 
-Install `qv` into your virtual environment or globally via pip or uv:
+Install `python-qv` into your virtual environment or globally via pip or uv (provides the `qv` CLI):
 
 ```bash
 # Using pip
-pip install qv
+pip install python-qv
 
 # Using uv
-uv add qv --dev
+uv add python-qv --dev
 
 # Or run directly without installation using uvx
-uvx qv scan
+uvx python-qv scan
 ```
 
 ---

@@ -4,8 +4,8 @@
 
 **Diagnose why your Python project is unhealthy — understand the root cause and get safe, actionable fixes.**
 
-[![PyPI Version](https://img.shields.io/pypi/v/qv.svg?color=blue)](https://pypi.org/project/qv/)
-[![Python Versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qv/)
+[![PyPI Version](https://img.shields.io/pypi/v/python-qv.svg?color=blue)](https://pypi.org/project/python-qv/)
+[![Python Versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/python-qv/)
 [![CI Status](https://github.com/inzamol/qv/actions/workflows/ci.yml/badge.svg)](https://github.com/inzamol/qv/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
@@ -52,19 +52,19 @@ Health Score: 85/100
 
 ## 📦 Installation
 
-Install `qv` into your virtual environment or run it directly without installation:
+Install `python-qv` into your virtual environment (provides the `qv` CLI):
 
 ```bash
 # Using pip
-pip install qv
+pip install python-qv
 
 # Using uv
-uv add qv --dev
+uv add python-qv --dev
 
 # Run directly without installing (via uvx or pipx)
-uvx qv scan
+uvx python-qv scan
 # or
-pipx run qv scan
+pipx run python-qv scan
 ```
 
 ---

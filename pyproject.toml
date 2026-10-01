@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "qv"
+name = "python-qv"
 version = "0.1.0"
 description = "Diagnose why a Python project is unhealthy — explain root cause and suggest safe fixes."
 readme = "README.md"
@@ -48,6 +48,7 @@ dev = [
 
 [project.scripts]
 qv = "qv.cli.main:cli"
+python-qv = "qv.cli.main:cli"
 pydoctor = "qv.cli.main:cli"
 
 [tool.hatch.build.targets.wheel]
