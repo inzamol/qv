@@ -49,8 +49,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           uv run python -c "
-          import os, sys, tomllib
+          import os, sys
           from pathlib import Path
+          try:
+              import tomllib
+          except ImportError:
+              import tomli as tomllib
 
           tag = os.environ.get('GITHUB_REF_NAME', '')
           if not tag.startswith('v'):
