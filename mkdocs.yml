@@ -1,7 +1,7 @@
 site_name: ""
 site_description: Diagnose why your Python project is unhealthy — understand the root cause and get safe, actionable fixes.
 site_author: Inzamul Hoque
-site_url: https://qv.readthedocs.io/
+site_url: https://inzamol.github.io/qv/
 repo_url: https://github.com/inzamol/qv
 repo_name: inzamol/qv
 

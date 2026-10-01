@@ -35,7 +35,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/inzamol/qv"
 Repository = "https://github.com/inzamol/qv"
-Documentation = "https://qv.readthedocs.io/"
+Documentation = "https://inzamol.github.io/qv/"
 Issues = "https://github.com/inzamol/qv/issues"
 
 [project.optional-dependencies]
