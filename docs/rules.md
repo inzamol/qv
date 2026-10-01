@@ -287,3 +287,158 @@
 - **Description:** Using integer literals for `status_code` (e.g. `status_code=201`) reduces readability compared to `status.HTTP_201_CREATED`.
 - **Remediation:** Import `status` from `fastapi` and use named constants (e.g. `status.HTTP_201_CREATED`).
 
+---
+
+## 6. SQLAlchemy & SQL Database Rules
+
+### 6.1 SQL-001: Potential N+1 Database Query in Loop
+- **Default Severity:** `WARNING`
+- **Description:** Executing queries (`session.execute`, `session.query`, `session.get`) inside `for` or `while` loops triggers N+1 database roundtrips.
+- **Remediation:** Batch load records using `where(Model.id.in_(ids))` or configure eager loading with `joinedload`/`selectinload`.
+
+### 6.2 SQL-002: Session Instantiated Without Context Manager or Cleanup
+- **Default Severity:** `WARNING`
+- **Description:** Creating a `Session` or `SessionLocal()` without a `with` block or `try...finally: session.close()` leaks active database connections.
+- **Remediation:** Use `with SessionLocal() as session:` or a dependency yield pattern.
+
+### 6.3 SQL-003: Synchronous DB Operation in Async Event Loop
+- **Default Severity:** `ERROR`
+- **Description:** Invoking synchronous `create_engine()` or synchronous session operations inside `async def` functions blocks the event loop.
+- **Remediation:** Use `create_async_engine()` and `AsyncSession` with async drivers (e.g. `asyncpg`, `aiosqlite`).
+
+### 6.4 SQL-004: Raw SQL String Interpolation (SQL Injection Risk)
+- **Default Severity:** `ERROR`
+- **Description:** Formatting SQL query strings using f-strings, `%`, or `.format()` inside `text()` or `cursor.execute()` introduces critical SQL injection vulnerabilities.
+- **Remediation:** Use bound parameters (`text("SELECT * FROM users WHERE id = :id"), {"id": user_val}`).
+
+### 6.5 SQL-005: Legacy SQLAlchemy 1.x `session.query()` Syntax
+- **Default Severity:** `WARNING`
+- **Description:** Using legacy `session.query(...)` in SQLAlchemy 2.0 projects instead of 2.0-style `select()` statements.
+- **Remediation:** Migrate to `session.scalars(select(Model).where(...))`.
+
+### 6.6 SQL-006: Missing Relationship Eager Loading Strategy in Async Session
+- **Default Severity:** `WARNING`
+- **Description:** Accessing lazy-loaded ORM relationships in async sessions triggers `MissingGreenlet` errors at runtime.
+- **Remediation:** Configure `lazy="selectin"` on relationships or apply `.options(selectinload(Model.relation))`.
+
+### 6.7 SQL-007: Uncommitted Transaction in Mutation Function
+- **Default Severity:** `WARNING`
+- **Description:** A function calls `session.add(...)` or `session.delete(...)` but never executes `session.commit()` or `with session.begin():`.
+- **Remediation:** Call `session.commit()` or wrap in `with session.begin():`.
+
+### 6.8 SQL-008: `create_engine` Missing `pool_pre_ping` Connection Health Check
+- **Default Severity:** `WARNING`
+- **Description:** Database engines created without `pool_pre_ping=True` risk stale connection disconnects when idle connections are closed by servers/firewalls.
+- **Remediation:** Add `pool_pre_ping=True` to `create_engine()` / `create_async_engine()`.
+
+### 6.9 SQL-009: `expire_on_commit=True` in `AsyncSession`
+- **Default Severity:** `WARNING`
+- **Description:** Leaving `expire_on_commit=True` in `AsyncSession` or `async_sessionmaker` causes `MissingGreenlet` errors when accessing committed model attributes.
+- **Remediation:** Specify `expire_on_commit=False`.
+
+### 6.10 SQL-010: Hardcoded Database Credentials in Connection URL
+- **Default Severity:** `ERROR`
+- **Description:** Plaintext passwords and connection secrets are committed directly into Python source code.
+- **Remediation:** Load database credentials from environment variables (`os.getenv("DATABASE_URL")`).
+
+### 6.11 SQL-011: Unbounded `SELECT` Query Without Limit or Pagination
+- **Default Severity:** `WARNING`
+- **Description:** Calling `.all()` on database queries without `.limit()` or pagination clauses risks out-of-memory crashes on large tables.
+- **Remediation:** Add `.limit(PAGE_SIZE)` and pagination parameters.
+
+### 6.12 SQL-012: Relationship Cascade Delete Without ForeignKey `ondelete="CASCADE"`
+- **Default Severity:** `INFO`
+- **Description:** `cascade="all, delete-orphan"` on ORM relationships without database-level `ondelete="CASCADE"` on the foreign key forces slow Python-side row-by-row deletion.
+- **Remediation:** Add `ondelete="CASCADE"` to the `ForeignKey` definition.
+
+### 6.13 SQL-013: Session Flush or Commit Called Inside Loop
+- **Default Severity:** `WARNING`
+- **Description:** Calling `session.flush()` or `session.commit()` inside tight loops creates excessive database network roundtrips.
+- **Remediation:** Commit once after the loop or use bulk insert statements (`session.execute(insert(Model), batch)`).
+
+### 6.14 SQL-014: Deprecated `declarative_base()` Function
+- **Default Severity:** `WARNING`
+- **Description:** Using legacy `Base = declarative_base()` instead of modern SQLAlchemy 2.0 `class Base(DeclarativeBase): pass`.
+- **Remediation:** Subclass `DeclarativeBase` from `sqlalchemy.orm`.
+
+### 6.15 SQL-015: SQLite Engine Missing `check_same_thread=False` in Multi-Threaded Application
+- **Default Severity:** `WARNING`
+- **Description:** Using SQLite engines across threads in web servers without `connect_args={"check_same_thread": False}` causes `ProgrammingError`.
+- **Remediation:** Set `connect_args={"check_same_thread": False}` when instantiating SQLite engines.
+
+### 6.16 SQL-016: Missing Database Migration Configuration (Alembic)
+- **Default Severity:** `INFO`
+- **Description:** SQLAlchemy ORM models are declared in the codebase, but no Alembic migrations directory or `alembic.ini` file exists.
+- **Remediation:** Initialize database migrations using `alembic init alembic`.
+
+### 6.17 SQL-017: `Mapped[...]` Attribute Missing `mapped_column()` in 2.0 Declarative Model
+- **Default Severity:** `WARNING`
+- **Description:** Using legacy `Column(...)` or untyped field definitions alongside `Mapped[...]` type annotations in SQLAlchemy 2.0 declarative models.
+- **Remediation:** Replace `col: Mapped[int] = Column(Integer)` with `col: Mapped[int] = mapped_column()`.
+
+### 6.18 SQL-018: Excessive Connection Pool Size in Single Application Instance
+- **Default Severity:** `WARNING`
+- **Description:** Configuring `create_engine` with `pool_size` or `max_overflow` > 50 in a single application worker risks exhausting database `max_connections`.
+- **Remediation:** Keep `pool_size` between 5 and 20 per worker and scale using an external connection pooler like pgBouncer.
+
+### 6.19 SQL-019: `NullPool` Configured in Persistent Web Application
+- **Default Severity:** `WARNING`
+- **Description:** Setting `poolclass=NullPool` in a persistent web server disables connection pooling, forcing a new TCP handshake and SSL negotiation on every request.
+- **Remediation:** Use default `QueuePool` for persistent web applications; reserve `NullPool` for ephemeral AWS Lambda/serverless environments.
+
+### 6.20 SQL-020: Declarative ORM Model Missing Primary Key Definition
+- **Default Severity:** `ERROR`
+- **Description:** A concrete model inheriting from `Base` / `DeclarativeBase` does not declare a primary key column, causing runtime ORM identity map failures.
+- **Remediation:** Mark at least one column with `primary_key=True` or `mapped_column(primary_key=True)`.
+
+### 6.21 SQL-021: Missing `session.rollback()` in Database Exception Handler
+- **Default Severity:** `WARNING`
+- **Description:** An `except` block catches errors around database operations but fails to call `session.rollback()`, leaving the session in an unusable invalid transaction state.
+- **Remediation:** Add `session.rollback()` inside `except` handlers or wrap operations in `with session.begin():`.
+
+### 6.22 SQL-022: Large Binary or Heavy Text Column Without `deferred()` Strategy
+- **Default Severity:** `INFO`
+- **Description:** Model includes heavy `LargeBinary`, `BLOB`, or `BYTEA` columns that are eagerly loaded on every `SELECT *`, consuming excessive application memory.
+- **Remediation:** Wrap the column in `deferred(Column(LargeBinary))` or use `.options(load_only(...))`.
+
+### 6.23 SQL-023: `ForeignKey` Column Defined Without `index=True`
+- **Default Severity:** `WARNING`
+- **Description:** Foreign key column created without an index, resulting in slow sequential table scans during `JOIN` queries, foreign key lookups, and cascade operations.
+- **Remediation:** Add `index=True` to ForeignKey column definitions (e.g. `Column(Integer, ForeignKey("users.id"), index=True)`).
+
+### 6.24 SQL-024: Insecure Unencrypted Remote Database Connection URL
+- **Default Severity:** `WARNING`
+- **Description:** Remote database connection URL targeting external hosts does not specify SSL encryption parameters (`sslmode=require` or `ssl=true`).
+- **Remediation:** Append `?sslmode=require` (PostgreSQL) or `?ssl=true` to remote connection strings.
+
+### 6.25 SQL-025: Deprecated `engine.execute()` or `engine.scalar()` Direct Call
+- **Default Severity:** `ERROR`
+- **Description:** Invoking `engine.execute(...)` or `engine.scalar(...)` directly is removed in SQLAlchemy 2.0.
+- **Remediation:** Acquire an explicit connection: `with engine.connect() as conn: result = conn.execute(stmt)`.
+
+### 6.26 SQL-026: `AsyncSession` Instantiated Without Async Context Manager or `await close()`
+- **Default Severity:** `WARNING`
+- **Description:** `AsyncSession` created in an `async def` function without `async with` or explicit `await session.close()`, causing leaked database connections.
+- **Remediation:** Use `async with AsyncSessionLocal() as session:` or ensure `await session.close()` is called in a `finally` block.
+
+### 6.27 SQL-027: Unsafe Concurrent Numeric Balance or Counter Update Without `with_for_update()`
+- **Default Severity:** `WARNING`
+- **Description:** Querying a record and mutating numeric balances or stock quantities (`balance -= amount`) without row-level locking causes lost-update race conditions.
+- **Remediation:** Lock rows using `select(...).with_for_update()` or use atomic SQL increments `update(Account).values(balance=Account.balance - amount)`.
+
+### 6.28 SQL-028: Thread-Local `scoped_session` Used in Async Context
+- **Default Severity:** `ERROR`
+- **Description:** Using thread-local `scoped_session` in `asyncio` code causes concurrent coroutines to unsafely share session instances.
+- **Remediation:** Use `async_scoped_session(..., scopefunc=asyncio.current_task)` or FastAPI per-request dependency injection.
+
+### 6.29 SQL-029: Declarative ORM Model Missing `__tablename__` Definition
+- **Default Severity:** `ERROR`
+- **Description:** Concrete declarative model class inheriting from `Base` does not declare `__tablename__` or `__table__`.
+- **Remediation:** Define `__tablename__ = "table_name"` on the model (or set `__abstract__ = True` for reusable mixins).
+
+### 6.30 SQL-030: Direct DBAPI `raw_connection()` Used Without Cleanup
+- **Default Severity:** `WARNING`
+- **Description:** Calling `engine.raw_connection()` bypasses connection pool lifecycle management and leaks connections if not closed explicitly.
+- **Remediation:** Wrap in `try...finally`: `raw_conn = engine.raw_connection(); try: ... finally: raw_conn.close()`.
+
+

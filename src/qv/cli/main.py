@@ -277,65 +277,6 @@ def architecture_cmd(path: Path) -> None:
     sys.exit(1 if result.has_blocking_errors else 0)
 
 
-@cli.command("framework")
-@click.argument(
-    "path",
-    default=".",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-)
-@click.option(
-    "--name",
-    "-n",
-    "framework_name",
-    type=click.Choice(["fastapi", "all"], case_sensitive=False),
-    default="all",
-    help="Filter scan to a specific framework (e.g. fastapi).",
-)
-def framework_cmd(path: Path, framework_name: str) -> None:
-    """Run framework-specific diagnostic checks (FastAPI, etc.)."""
-    try:
-        pyproject_path = path / "pyproject.toml"
-        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
-        discovery = ProjectDiscovery(root=path, config=config)
-        context = discovery.discover_context()
-
-        analyzers = [cls() for cls in AVAILABLE_FRAMEWORK_ANALYZERS]
-        if framework_name != "all":
-            analyzers = [a for a in analyzers if a.id.lower() == framework_name.lower()]
-
-        engine = AnalysisEngine(analyzers=analyzers, config=config)
-        result = engine.run(context)
-        TerminalReporter(console=console).print_result(result)
-        sys.exit(1 if result.has_blocking_errors else 0)
-    except click.ClickException:
-        raise
-    except SystemExit:
-        raise
-    except Exception as e:
-        console.print(f"[bold red]Framework analysis failed:[/bold red] {e}")
-        sys.exit(3)
-
-
-@cli.command("frameworks")
-@click.argument(
-    "path",
-    default=".",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-)
-@click.option(
-    "--name",
-    "-n",
-    "framework_name",
-    type=click.Choice(["fastapi", "all"], case_sensitive=False),
-    default="all",
-    help="Filter scan to a specific framework.",
-)
-@click.pass_context
-def frameworks_cmd(ctx: click.Context, path: Path, framework_name: str) -> None:
-    """Alias for 'qv framework' command."""
-    ctx.invoke(framework_cmd, path=path, framework_name=framework_name)
-
-
 @cli.command("fix")
 @click.argument(
     "path",
@@ -585,6 +526,89 @@ def graph_cmd(
         max_depth=max_depth,
         as_json=as_json,
     )
+
+
+@cli.command("framework")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--name",
+    "-n",
+    type=str,
+    default=None,
+    help="Filter by framework plugin name (e.g. 'fastapi', 'sqlalchemy', 'sql').",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output JSON results.")
+@click.option("--sarif", "as_sarif", is_flag=True, help="Output SARIF results.")
+def framework_cmd(path: Path, name: str | None, as_json: bool, as_sarif: bool) -> None:
+    """Run framework-specific doctors (FastAPI, SQLAlchemy, Celery, Django)."""
+    try:
+        pyproject_path = path / "pyproject.toml"
+        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
+        discovery = ProjectDiscovery(root=path, config=config)
+        context = discovery.discover_context()
+
+        # Select framework analyzers
+        analyzers_to_run = []
+        for cls in AVAILABLE_FRAMEWORK_ANALYZERS:
+            inst = cls()
+            if name:
+                target_name = name.lower()
+                if target_name in (inst.id.lower(), inst.name.lower()) or (
+                    target_name == "sql" and inst.id == "sqlalchemy"
+                ):
+                    analyzers_to_run.append(inst)
+            else:
+                analyzers_to_run.append(inst)
+
+        if not analyzers_to_run:
+            console.print(
+                f"[bold red]Unknown framework '{name}'. Available: fastapi, sqlalchemy[/bold red]"
+            )
+            sys.exit(2)
+
+        engine = AnalysisEngine(config=config, analyzers=analyzers_to_run)
+        result = engine.run(context)
+
+        if as_json:
+            reporter = JsonReporter()
+            click.echo(reporter.render(result))
+        elif as_sarif:
+            reporter = SarifReporter()
+            click.echo(reporter.render(result))
+        else:
+            TerminalReporter(console=console).print_result(result)
+
+        if result.has_blocking_errors:
+            sys.exit(1)
+        sys.exit(0)
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Error running framework analysis: {e}[/bold red]")
+        sys.exit(3)
+
+
+@cli.command("frameworks")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option("--name", "-n", type=str, default=None, help="Filter by framework plugin name.")
+@click.option("--json", "as_json", is_flag=True, help="Output JSON results.")
+@click.option("--sarif", "as_sarif", is_flag=True, help="Output SARIF results.")
+@click.pass_context
+def frameworks_cmd(
+    ctx: click.Context, path: Path, name: str | None, as_json: bool, as_sarif: bool
+) -> None:
+    """Alias for 'qv framework' command."""
+    ctx.invoke(framework_cmd, path=path, name=name, as_json=as_json, as_sarif=as_sarif)
 
 
 @cli.command("inspect")
