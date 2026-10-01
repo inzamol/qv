@@ -1,4 +1,4 @@
-site_name: ""
+site_name: qv
 site_description: Diagnose why your Python project is unhealthy — understand the root cause and get safe, actionable fixes.
 site_author: Inzamul Hoque
 site_url: https://inzamol.github.io/qv/
@@ -18,26 +18,29 @@ theme:
     # Light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: cyan
-      accent: deep orange
+      primary: slate
+      accent: indigo
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     # Dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: cyan
-      accent: deep orange
+      primary: slate
+      accent: indigo
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
   features:
     - navigation.instant
     - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
     - navigation.path
     - navigation.top
+    - navigation.footer
     - toc.follow
     - content.code.copy
     - content.code.annotate
