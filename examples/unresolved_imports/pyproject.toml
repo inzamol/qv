@@ -1,0 +1,6 @@
+[project]
+name = "unresolved-imports-example"
+version = "0.1.0"
+description = "Example project demonstrating IMP-002 unresolved local import detection."
+requires-python = ">=3.10"
+dependencies = []

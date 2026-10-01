@@ -88,10 +88,20 @@ DEP-005 = "warning"
 IMP-001 = "error"
 IMP-002 = "error"
 
+[tool.pyright]
+include = ["src", "tests"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+    "examples",
+    ".venv",
+]
+
 [tool.qv.paths]
 exclude = [
     ".venv",
     "build",
     "dist",
     "node_modules",
+    "examples",
 ]

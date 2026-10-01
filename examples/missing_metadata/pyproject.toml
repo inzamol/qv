@@ -1,0 +1,5 @@
+# A bare pyproject.toml without standard [project] table (PEP 621)
+# This will trigger PKG-001: Missing package metadata
+
+[tool.ruff]
+line-length = 88

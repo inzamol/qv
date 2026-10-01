@@ -1,0 +1,6 @@
+[project]
+name = "circular-imports-example"
+version = "0.1.0"
+description = "Example project demonstrating IMP-001 circular import detection."
+requires-python = ">=3.10"
+dependencies = []

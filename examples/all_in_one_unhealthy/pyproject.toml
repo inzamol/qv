@@ -1,0 +1,10 @@
+[project]
+name = "all-in-one-demo"
+version = "0.1.0"
+description = "Comprehensive unhealthy demo testing multiple qv analyzers and fixes simultaneously."
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.0",
+    "requests>=2.31.0",      # UNUSED: trigger DEP-003
+    "pyyaml>=6.0",          # UNUSED: trigger DEP-003
+]

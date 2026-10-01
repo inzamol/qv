@@ -139,6 +139,11 @@ qv dependency       # Check package constraints & imports
 qv environment      # Check Python, Docker & CI version drift
 qv architecture     # Check for circular imports & dead paths
 
+# Automatically fix detectable issues
+qv fix              # Interactive fix wizard
+qv fix --dry-run    # Preview fixes and diffs
+qv fix -y           # Apply all safe fixes automatically
+
 # Explain a rule
 qv explain DEP-002
 

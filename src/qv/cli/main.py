@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from qv import __version__
 from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
@@ -17,6 +18,7 @@ from qv.core.config import QvConfig
 from qv.core.engine import AnalysisEngine
 from qv.core.models import Severity
 from qv.core.project import ProjectDiscovery
+from qv.remediation.engine import RemediationEngine
 from qv.reporters.json_reporter import JsonReporter
 from qv.reporters.sarif import SarifReporter
 from qv.reporters.terminal import TerminalReporter
@@ -236,6 +238,137 @@ def architecture_cmd(path: Path) -> None:
     result = engine.run(context)
     TerminalReporter(console=console).print_result(result)
     sys.exit(1 if result.has_blocking_errors else 0)
+
+
+@cli.command("fix")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Display proposed fixes and diffs without modifying any files.",
+)
+@click.option(
+    "-y",
+    "--yes",
+    "auto_approve",
+    is_flag=True,
+    help="Automatically apply all safe fixes without prompting.",
+)
+@click.option(
+    "--rule",
+    "rule_filter",
+    type=str,
+    default=None,
+    help="Filter remediation to a specific rule ID (e.g. DEP-002).",
+)
+@click.option(
+    "--sync",
+    "execute_sync",
+    is_flag=True,
+    help="Execute suggested package manager sync/install commands.",
+)
+def fix_cmd(
+    path: Path,
+    dry_run: bool,
+    auto_approve: bool,
+    rule_filter: str | None,
+    execute_sync: bool,
+) -> None:
+    """Safely and automatically fix detectable diagnostic health issues."""
+    try:
+        pyproject_path = path / "pyproject.toml"
+        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
+        discovery = ProjectDiscovery(root=path, config=config)
+        context = discovery.discover_context()
+
+        engine = AnalysisEngine(
+            analyzers=[
+                DependencyAnalyzer(),
+                EnvironmentAnalyzer(),
+                ImportAnalyzer(),
+            ],
+            config=config,
+        )
+        scan_result = engine.run(context)
+
+        remediation_engine = RemediationEngine(project_root=path)
+        plan = remediation_engine.plan_fixes(scan_result, rule_filter=rule_filter)
+
+        if not plan.actions:
+            console.print("[green]✓ No automated fixes needed. Project is healthy![/green]")
+            sys.exit(0)
+
+        console.print(
+            f"\n[bold cyan]Found {len(plan.actions)} actionable fix(es)[/bold cyan] ({plan.safe_fixes_count} safe):\n"
+        )
+
+        table = Table(
+            title="Proposed Fixes",
+            show_header=True,
+            header_style="bold cyan",
+            border_style="dim",
+            show_lines=False,
+        )
+        table.add_column("Rule", style="bold yellow", no_wrap=True)
+        table.add_column("Target", style="cyan")
+        table.add_column("Description", style="white")
+        table.add_column("Type", style="dim")
+
+        for act in plan.actions:
+            table.add_row(
+                act.rule_id,
+                act.target_file or "shell",
+                act.description,
+                act.action_type.value,
+            )
+
+        console.print(table)
+
+        if dry_run:
+            console.print("\n[yellow]Dry-run mode enabled. No changes written to disk.[/yellow]")
+            sys.exit(0)
+
+        if not auto_approve:
+            if not click.confirm("\nApply these safe fixes to your project?", default=True):
+                console.print("[yellow]Remediation cancelled by user.[/yellow]")
+                sys.exit(0)
+
+        result = remediation_engine.apply_plan(
+            plan,
+            dry_run=False,
+            execute_commands=execute_sync,
+        )
+
+        console.print(
+            f"\n[bold green]✓ Successfully applied {len(result.applied)} fix(es)![/bold green]"
+        )
+        for act in result.applied:
+            console.print(f"  [green]+[/green] {act.description}")
+
+        if result.skipped:
+            console.print(f"\n[yellow]Skipped {len(result.skipped)} action(s):[/yellow]")
+            for act in result.skipped:
+                console.print(f"  [dim]- {act.description} (use --sync to run commands)[/dim]")
+
+        if result.failed:
+            console.print(f"\n[bold red]Failed {len(result.failed)} action(s):[/bold red]")
+            for act, err in result.failed:
+                console.print(f"  [red]✗ {act.description}: {err}[/red]")
+            sys.exit(1)
+
+        sys.exit(0)
+
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Remediation failed:[/bold red] {e}")
+        sys.exit(3)
 
 
 @cli.command("version")

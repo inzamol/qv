@@ -1,0 +1,6 @@
+[project]
+name = "env-drift-example"
+version = "0.1.0"
+description = "Example project demonstrating ENV-002 Docker drift and ENV-003 CI matrix drift."
+requires-python = ">=3.12"
+dependencies = []

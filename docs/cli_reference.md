@@ -48,6 +48,35 @@ qv scan [PATH] [OPTIONS]
 
 ---
 
+## `qv fix`
+
+Safely and automatically fixes detectable diagnostic health issues (e.g., adding missing dependencies to `pyproject.toml`, removing unused dependencies, initializing packaging metadata).
+
+```bash
+qv fix [PATH] [OPTIONS]
+```
+
+### Options
+
+| Option | Description |
+|---|---|
+| `--dry-run` | Shows proposed fixes and diffs without modifying any files |
+| `-y`, `--yes` | Automatically applies all safe fixes without interactive confirmation |
+| `--rule <RULE_ID>` | Filters remediation to a specific rule ID (e.g. `DEP-002`) |
+| `--sync` | Runs suggested package manager install/sync commands |
+
+Example:
+
+```bash
+# Preview proposed fixes
+qv fix --dry-run
+
+# Apply all safe fixes automatically
+qv fix -y
+```
+
+---
+
 ## `qv explain`
 
 Displays detailed explanations, evidence requirements, and remediation instructions for a rule.
