@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from click.testing import CliRunner
+
 from qv.cli.main import cli
 from qv.core.models import Diagnostic, ScanResult, ScanSummary, Severity
 from qv.remediation.engine import RemediationEngine

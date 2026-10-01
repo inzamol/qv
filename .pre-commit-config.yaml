@@ -1,13 +1,22 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.10
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-
   - repo: local
     hooks:
+      - id: ruff-check
+        name: ruff check & fix
+        entry: uv run ruff check --fix .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
       - id: qv-scan
         name: qv health scan
         entry: uv run qv scan
@@ -15,3 +24,20 @@ repos:
         args: [--strict, --offline]
         pass_filenames: false
         always_run: true
+        stages: [pre-commit]
+
+      - id: pytest-check
+        name: pytest test suite
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: pyright-check
+        name: pyright typecheck
+        entry: uv run pyright
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

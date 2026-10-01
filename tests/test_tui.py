@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rich.console import Console
+
 from qv.core.models import Diagnostic, Evidence, ScanResult, Severity, Suggestion
 from qv.tui.app import TuiExplorer
-from rich.console import Console
 
 
 def test_tui_explorer_render_layout(tmp_path: Path):
