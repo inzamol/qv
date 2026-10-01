@@ -12,10 +12,7 @@ build:
 mkdocs:
   configuration: mkdocs.yml
 
-# Install docs dependencies from pyproject.toml [project.optional-dependencies] docs
+# Install docs dependencies
 python:
   install:
-    - method: pip
-      path: .
-      extra_requirements:
-        - docs
+    - requirements: docs/requirements.txt
