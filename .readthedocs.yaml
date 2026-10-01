@@ -1,16 +1,19 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
 version: 2
 
 build:
   os: ubuntu-24.04
   tools:
     python: "3.12"
-  jobs:
-    post_create_environment:
-      # Install uv for fast dependency resolution
-      - pip install uv
-    post_install:
-      # Install docs dependencies using uv
-      - uv pip install --system -e ".[docs]"
 
 mkdocs:
   configuration: mkdocs.yml
+
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
