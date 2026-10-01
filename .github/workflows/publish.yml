@@ -1,12 +1,12 @@
-name: Publish to PyPI
+name: Publish to PyPI & GitHub Release
 
 on:
-  release:
-    types: [published]
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "v[0-9]+.[0-9]+.[0-9]+-*"
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       target:
@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Run Pre-Flight Quality & Test Suite
+    name: Validate Tag, Lint & Test Suite
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -45,6 +45,35 @@ jobs:
       - name: Install all dependencies
         run: uv sync --all-extras
 
+      - name: Validate Git Tag vs Package Version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          uv run python -c "
+          import os, sys, tomllib
+          from pathlib import Path
+
+          tag = os.environ.get('GITHUB_REF_NAME', '')
+          if not tag.startswith('v'):
+              sys.exit(0)
+          tag_ver = tag.lstrip('v')
+          pyproject = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))
+          toml_ver = pyproject.get('project', {}).get('version', '')
+
+          from qv import __version__ as code_ver
+
+          errors = []
+          if tag_ver != toml_ver:
+              errors.append(f'Git tag version ({tag_ver}) != pyproject.toml version ({toml_ver})')
+          if tag_ver != code_ver:
+              errors.append(f'Git tag version ({tag_ver}) != qv.__version__ ({code_ver})')
+
+          if errors:
+              for err in errors:
+                  print(f'::error::{err}')
+              sys.exit(1)
+          print(f'✓ Tag {tag} strictly matches pyproject.toml and qv.__version__ ({tag_ver})')
+          "
+
       - name: Lint and formatting checks
         run: |
           uv run ruff check .
@@ -57,7 +86,7 @@ jobs:
         run: uv run pytest --cov=src/qv --cov-report=term-missing
 
   build:
-    name: Build & Verify Distributions
+    name: Build, Attest & Release Assets
     needs: [validate]
     runs-on: ubuntu-latest
     permissions:
@@ -91,16 +120,19 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-      - name: Upload distribution assets to GitHub Release
-        if: github.event_name == 'release' && github.event.action == 'published'
+      - name: Create or Update GitHub Release with Notes
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          generate_release_notes: true
+          draft: false
+          prerelease: contains(github.ref, '-')
 
   publish-to-pypi:
     name: Publish to PyPI
     needs: [build]
-    if: (github.event_name == 'release' && github.event.action == 'published') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'release' && github.event.action == 'published') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi')
     runs-on: ubuntu-latest
     environment:
       name: pypi
