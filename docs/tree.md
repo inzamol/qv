@@ -1,10 +1,10 @@
-# 🌲 Dependency & Architecture Tree
+# Dependency & Architecture Tree
 
 `qv` provides visual representations of both your package dependency tree and your internal source module import architecture.
 
 ---
 
-## 🚀 Basic Usage
+## 1. Basic Usage
 
 ```bash
 # Render full project view (dependencies + import graph)
@@ -16,7 +16,7 @@ qv graph
 
 ---
 
-## 🔍 Visualizing Package Dependencies
+## 2. Visualizing Package Dependencies
 
 To focus exclusively on direct and transitive package dependencies:
 
@@ -26,7 +26,7 @@ qv tree --dependencies
 qv tree -d
 ```
 
-### Limiting Tree Depth
+### 2.1 Limiting Tree Depth
 
 Limit the hierarchy depth using `--depth` / `-L`:
 
@@ -50,7 +50,7 @@ fastapi (0.110.0) [direct]
 
 ---
 
-## 🔄 Visualizing Internal Module Imports & Circular Loops
+## 3. Visualizing Internal Module Imports & Circular Loops
 
 To inspect internal Python module imports and pinpoint circular dependency cycles:
 
@@ -76,7 +76,7 @@ services.auth
 
 ---
 
-## 📄 JSON Export for Tooling
+## 4. JSON Export for Tooling
 
 To emit the tree hierarchy, package statistics, and detected cycles as structured JSON for CI ingestion or custom dashboards:
 

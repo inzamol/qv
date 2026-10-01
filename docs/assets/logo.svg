@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <!-- Background Badge / Squircle -->
+  <rect x="8" y="8" width="104" height="104" rx="26" fill="#09090B" stroke="#27272A" stroke-width="2" />
+
+  <!-- Subtle inner ambient frame -->
+  <rect x="14" y="14" width="92" height="92" rx="20" fill="none" stroke="#18181B" stroke-width="1" />
+
+  <!-- 'q' glyph -->
+  <circle cx="44" cy="54" r="16" fill="none" stroke="#FFFFFF" stroke-width="7" />
+  <path d="M60 38 L60 80" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" />
+
+  <!-- 'v' glyph -->
+  <path d="M68 42 L80 72 L92 42" fill="none" stroke="#E4E4E7" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Diagnostic focal dot -->
+  <circle cx="94" cy="34" r="3" fill="#A1A1AA" />
+</svg>

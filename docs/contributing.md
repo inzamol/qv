@@ -1,20 +1,20 @@
-# 🤝 Contributing to qv
+# Contributing to qv
 
 Thank you for your interest in contributing to `qv`! We welcome bug reports, documentation improvements, new diagnostic rules, performance enhancements, and ecosystem visualizers.
 
 ---
 
-## 🛠️ Development Setup
+## 1. Development Setup
 
 `qv` uses [`uv`](https://docs.astral.sh/uv/) for high-performance virtual environments and dependency management.
 
-### 1. Prerequisites
+### 1.1 Prerequisites
 
 - Python 3.10, 3.11, 3.12, or 3.13
 - `uv` installed (`curl -LsSf https://astral.sh/uv/install.sh | sh` or `pip install uv` / `brew install uv`)
 - Git
 
-### 2. Clone & Sync Environment
+### 1.2 Clone & Sync Environment
 
 ```bash
 git clone https://github.com/inzamol/qv.git
@@ -24,12 +24,12 @@ cd qv
 uv sync --all-extras
 ```
 
-### 3. Install Pre-commit Hooks
+### 1.3 Install Pre-commit Hooks
 
 Ensure all code meets style and safety checks automatically before committing:
 
 ```bash
-uv run pre-commit install
+uv run pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 
 You can manually trigger pre-commit checks on all files at any time:
@@ -40,9 +40,9 @@ uv run pre-commit run --all-files
 
 ---
 
-## 🧪 Testing & Validation
+## 2. Testing & Validation
 
-### Fast Local Unit Tests
+### 2.1 Fast Local Unit Tests
 
 ```bash
 # Run full test suite
@@ -57,7 +57,7 @@ uv run pytest tests/test_tui.py
 uv run pytest --cov=src/qv --cov-report=term-missing
 ```
 
-### Type Checking & Linting
+### 2.2 Type Checking & Linting
 
 ```bash
 # Lint and format checks
@@ -68,23 +68,24 @@ uv run ruff format --check .
 uv run pyright
 ```
 
-### Multi-Environment Matrix Testing (Tox)
+### 2.3 Multi-Environment Matrix Testing (Tox)
 
 Always ensure your changes pass locally across all supported Python versions and QA environments before opening a PR:
 
 ```bash
-# Run all configured tox environments (py310, py311, py312, py313, lint, typecheck)
+# Run all configured tox environments (py310, py311, py312, py313, lint, typecheck, docs)
 uv run tox
 
 # Run specific target environments
 uv run tox -e py312
 uv run tox -e lint
 uv run tox -e typecheck
+uv run tox -e docs
 ```
 
 ---
 
-## 🏗️ Architecture Overview
+## 3. Architecture Overview
 
 ```text
                              CLI / TUI (click + rich)
@@ -118,7 +119,7 @@ uv run tox -e typecheck
 
 ---
 
-## 📋 Adding a New Diagnostic Rule
+## 4. Adding a New Diagnostic Rule
 
 Adding new rules is straightforward and modular:
 
@@ -146,17 +147,17 @@ Adding new rules is straightforward and modular:
 
 ---
 
-## 🎯 Code Quality Standards
+## 5. Code Quality Standards
 
 - **Strict Type Annotations**: All functions, methods, and public interfaces must be fully typed (verified with `pyright`).
 - **Zero-Network Analyzer Core**: Standard diagnostic checks must remain 100% offline, local, and fast (sub-second execution).
 - **Verifiable Evidence**: Every flagged diagnostic must provide specific source lines, version facts, or manifest references in its evidence list.
 - **Clean Diffs & Safety**: Remediation fixes must preview exact diffs and commands before modifying user projects.
-- **Passing Matrix**: All Tox environments (`py310` through `py313`, `lint`, `typecheck`) must pass with 100% test coverage for newly introduced rules.
+- **Passing Matrix**: All Tox environments (`py310` through `py313`, `lint`, `typecheck`, `docs`) must pass with 100% test coverage for newly introduced rules.
 
 ---
 
-## 🚀 Submitting a Pull Request
+## 6. Submitting a Pull Request
 
 1. Fork the repository and create a feature branch (`git checkout -b feat/my-new-rule`).
 2. Implement your changes following the standards above.

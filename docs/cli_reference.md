@@ -4,7 +4,7 @@
 
 ---
 
-## Global Options
+## 1. Global Options
 
 ```bash
 qv --help
@@ -13,7 +13,27 @@ qv --version
 
 ---
 
-## `qv scan`
+## 2. `qv init`
+
+Generates or updates the `[tool.qv]` configuration block in your `pyproject.toml` without overwriting existing settings.
+
+```bash
+qv init [PATH]
+```
+
+Example:
+
+```bash
+# Initialize [tool.qv] in current directory
+qv init
+
+# Initialize in a specific project path
+qv init ./services/backend
+```
+
+---
+
+## 3. `qv scan`
 
 Runs full diagnostic analysis on the specified directory.
 
@@ -21,13 +41,13 @@ Runs full diagnostic analysis on the specified directory.
 qv scan [PATH] [OPTIONS]
 ```
 
-### Arguments
+### 3.1 Arguments
 
 | Argument | Description | Default |
 |---|---|---|
 | `PATH` | Path to the project root directory | `.` (current directory) |
 
-### Options
+### 3.2 Options
 
 | Option | Description |
 |---|---|
@@ -40,7 +60,7 @@ qv scan [PATH] [OPTIONS]
 | `--offline` | Disables remote vulnerability/CVE queries (airgapped mode) |
 | `--output`, `-o <FILE>` | Writes output directly to a file |
 
-### Exit Codes
+### 3.3 Exit Codes
 
 | Exit Code | Meaning |
 |---|---|
@@ -51,7 +71,7 @@ qv scan [PATH] [OPTIONS]
 
 ---
 
-## `qv inspect` (alias: `qv ui`)
+## 4. `qv inspect` (alias: `qv ui`)
 
 Launches an interactive terminal dashboard (TUI) to navigate findings, expand evidence, view dependency trees, and apply fixes interactively with keyboard shortcuts.
 
@@ -60,7 +80,7 @@ qv inspect [PATH] [OPTIONS]
 qv ui [PATH] [OPTIONS]
 ```
 
-### Controls
+### 4.1 Controls
 
 | Key | Action |
 |---|---|
@@ -73,7 +93,7 @@ qv ui [PATH] [OPTIONS]
 
 ---
 
-## `qv fix`
+## 5. `qv fix`
 
 Safely and automatically fixes detectable diagnostic health issues (e.g., adding missing dependencies to `pyproject.toml`, removing unused dependencies, initializing packaging metadata).
 
@@ -81,7 +101,7 @@ Safely and automatically fixes detectable diagnostic health issues (e.g., adding
 qv fix [PATH] [OPTIONS]
 ```
 
-### Options
+### 5.1 Options
 
 | Option | Description |
 |---|---|
@@ -102,7 +122,7 @@ qv fix -y
 
 ---
 
-## `qv tree` / `qv graph`
+## 6. `qv tree` / `qv graph`
 
 Visualizes direct vs transitive package dependencies and internal source module import architecture (with circular import cycles highlighted).
 
@@ -110,7 +130,7 @@ Visualizes direct vs transitive package dependencies and internal source module 
 qv tree [PATH] [OPTIONS]
 ```
 
-### Options
+### 6.1 Options
 
 | Option | Description |
 |---|---|
@@ -134,7 +154,7 @@ qv tree -d -L 2
 
 ---
 
-## `qv explain`
+## 7. `qv explain`
 
 Displays detailed explanations, evidence requirements, and remediation instructions for a rule.
 
@@ -150,35 +170,25 @@ qv explain DEP-002
 
 ---
 
-## `qv init`
-
-Generates or updates the `[tool.qv]` configuration block in your `pyproject.toml`.
-
-```bash
-qv init [PATH]
-```
-
----
-
-## Targeted Subsystem Commands
+## 8. Targeted Subsystem Commands
 
 Run focused checks on specific areas without executing the full scan:
 
-### `qv dependency`
+### 8.1 `qv dependency`
 Scans for dependency conflicts, missing imports, unused packages, and version mismatches.
 
 ```bash
 qv dependency [PATH]
 ```
 
-### `qv environment`
+### 8.2 `qv environment`
 Checks for Python runtime drift between local environment, Dockerfiles, and CI matrices.
 
 ```bash
 qv environment [PATH]
 ```
 
-### `qv architecture`
+### 8.3 `qv architecture`
 Scans source code for circular imports and unresolved internal modules.
 
 ```bash

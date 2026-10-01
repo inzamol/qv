@@ -1,10 +1,10 @@
-# 🪝 Pre-commit Hook Integration
+# Pre-commit Hook Integration
 
 Catch dependency drift, missing imports, and circular cycles before code is ever committed with `qv`'s native [pre-commit](https://pre-commit.com/) integration.
 
 ---
 
-## 🚀 Quick Setup
+## 1. Quick Setup
 
 Add the following to your project's `.pre-commit-config.yaml`:
 
@@ -29,15 +29,15 @@ pre-commit install
 
 ---
 
-## 📋 Available Hooks
+## 2. Available Hooks
 
-### `qv-scan`
+### 2.1 `qv-scan`
 Runs `qv scan` across your repository.
 
 - **Default Arguments**: `[--strict, --offline]`
 - **Behavior**: Fast, airgapped execution. Fails the commit if any blocking errors or warnings are detected.
 
-### `qv-fix`
+### 2.2 `qv-fix`
 Runs `qv fix -y` across your repository.
 
 - **Default Arguments**: `[-y, --offline]`
@@ -45,7 +45,7 @@ Runs `qv fix -y` across your repository.
 
 ---
 
-## 🧪 Testing Hooks Locally
+## 3. Testing Hooks Locally
 
 Run pre-commit against all files without committing:
 

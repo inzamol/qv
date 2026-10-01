@@ -4,7 +4,7 @@
 
 ---
 
-## Example `pyproject.toml`
+## 1. Example `pyproject.toml`
 
 ```toml
 [tool.qv]
@@ -38,7 +38,7 @@ python = "3.12"
 
 ---
 
-## Severity Overrides
+## 2. Severity Overrides
 
 You can adjust how strictly any rule is treated:
 
@@ -51,7 +51,7 @@ You can adjust how strictly any rule is treated:
 
 ---
 
-## Ignore Rules
+## 3. Ignore Rules
 
 To suppress rules that are not applicable to your workflow, list them under `[tool.qv.ignore]`:
 
@@ -62,7 +62,7 @@ rules = ["DEP-003", "ENV-002"]
 
 ---
 
-## Precedence Order
+## 4. Precedence Order
 
 When resolving configuration, `qv` follows this precedence:
 

@@ -4,28 +4,54 @@
 
 ---
 
-## Installation
+## 1. Installation
 
 Install `python-qv` into your virtual environment or globally via pip or uv (provides the `qv` CLI):
 
+=== "Using uv"
+    ```bash
+    uv add python-qv --dev
+    ```
+
+=== "Using pip"
+    ```bash
+    pip install python-qv
+    ```
+
+=== "Run directly without installing"
+    ```bash
+    uvx python-qv scan
+    ```
+
+---
+
+## 2. Initialize Project Configuration (`qv init`)
+
+Before running extensive scans or configuring custom rule thresholds, initialize standard settings in your `pyproject.toml`:
+
 ```bash
-# Using pip
-pip install python-qv
+qv init
+```
 
-# Using uv
-uv add python-qv --dev
+This creates a default `[tool.qv]` configuration block without overwriting any of your existing project settings:
 
-# Or run directly without installation using uvx
-uvx python-qv scan
+```toml
+[tool.qv]
+[tool.qv.rules]
+DEP-001 = "error"
+DEP-002 = "error"
+DEP-003 = "warning"
+IMP-001 = "error"
+
+[tool.qv.paths]
+exclude = [".venv", "build", "dist"]
 ```
 
 ---
 
-## Quick Start
+## 3. Run a Health Scan (`qv scan`)
 
-### 1. Run a Health Scan
-
-Run `qv scan` in your project root:
+Run `qv scan` in your project root to perform a comprehensive diagnostic audit:
 
 ```bash
 qv scan
@@ -58,9 +84,31 @@ Health Score: 85/100
 
 ---
 
-### 2. Understand Diagnostic Rules
+## 4. Explore & Remediate Findings
 
-If a rule is flagged, you can get in-depth guidance using `explain`:
+### 4.1 Interactive TUI Dashboard (`qv inspect`)
+Launch the interactive terminal dashboard to navigate findings, inspect evidence, view dependency trees, and apply fixes with keyboard shortcuts:
+
+```bash
+qv inspect
+```
+
+### 4.2 Safe Automated Remediation (`qv fix`)
+Safely apply deterministic fixes (such as adding undeclared dependencies or pruning unused packages):
+
+```bash
+# Preview proposed diffs without touching disk
+qv fix --dry-run
+
+# Apply all safe fixes automatically
+qv fix -y
+```
+
+---
+
+## 5. Understand Diagnostic Rules (`qv explain`)
+
+If a specific diagnostic rule is flagged, you can get in-depth guidance, common causes, and remediation advice:
 
 ```bash
 qv explain DEP-001
@@ -68,21 +116,9 @@ qv explain DEP-001
 
 ---
 
-### 3. Initialize Configuration
+## 6. Next Steps
 
-To configure rule severities and paths in your `pyproject.toml`:
-
-```bash
-qv init
-```
-
-This adds a `[tool.qv]` configuration block without overwriting existing settings.
-
----
-
-## Next Steps
-
-- Explore the [CLI Reference](cli_reference.md) for all available commands and flags.
+- Explore the [CLI Commands Reference](cli_reference.md) for all commands, arguments, and flags.
 - Learn about the [Rules Catalog](rules.md) to understand detected issues.
-- Read [Configuration Guide](configuration.md) to customize rules for your project.
+- Read the [Configuration Guide](configuration.md) to customize rules for your project.
 - Integrate into [CI/CD](ci_integration.md) with SARIF and strict modes.

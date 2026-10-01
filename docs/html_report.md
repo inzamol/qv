@@ -1,10 +1,10 @@
-# 📊 Self-Contained HTML Report
+# Self-Contained HTML Report
 
 `qv` can generate a single-file, zero-dependency, self-contained HTML report that is fully portable and interactive. You can open it in any web browser, attach it to CI artifacts, or email it to teammates.
 
 ---
 
-## 🚀 Generating an HTML Report
+## 1. Generating an HTML Report
 
 Use the `--html` flag with `qv scan`:
 
@@ -21,34 +21,34 @@ qv scan --strict --html health-report.html
 
 ---
 
-## ✨ Features of the HTML Report
+## 2. Features of the HTML Report
 
-### 1. Zero External Dependencies
+### 2.1 Zero External Dependencies
 - All styles (CSS) and interactive scripts (vanilla JavaScript) are **embedded directly** in a single `.html` file.
 - Works 100% offline — no CDNs, external web fonts, or tracking scripts required.
 
-### 2. Interactive Circular Health Score
+### 2.2 Interactive Circular Health Score
 - Displays the project's health score (0–100) using a smooth SVG circular progress gauge.
 - Dynamically color-coded: **Green** (80–100), **Yellow** (50–79), **Red** (0–49).
 
-### 3. Real-Time Search & Filtering
+### 2.3 Real-Time Search & Filtering
 - **Search Bar**: Instant client-side filtering by rule ID (`DEP-002`), title, description, or file name.
 - **Severity Filters**: Filter diagnostics by **All**, **Errors Only**, or **Warnings Only** with interactive counters.
 
-### 4. Detailed Diagnostic Cards
+### 2.4 Detailed Diagnostic Cards
 Each finding card includes:
 - Severity pill badge and rule ID tag.
 - Location badge (e.g., `pyproject.toml`, `main.py:14`).
 - Collapsible **Evidence** section listing facts extracted from manifests and AST.
 - **Remediation Box** with one-click copy buttons for CLI commands and code snippets.
 
-### 5. Dark / Light Mode Toggle
+### 2.5 Dark / Light Mode Toggle
 - Includes a theme switch button in the top navigation bar.
 - Automatically detects the user's system preferences (`prefers-color-scheme`).
 
 ---
 
-## 🤖 Automating in GitHub Actions
+## 3. Automating in GitHub Actions
 
 You can automatically generate and upload the HTML report as a build artifact on every Pull Request:
 
@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v5
 
       - name: Generate HTML Report
         run: uv run qv scan --html qv-report.html

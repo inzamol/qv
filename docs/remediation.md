@@ -1,4 +1,4 @@
-# 🛠️ Safe Automated Remediation
+# Safe Automated Remediation
 
 `qv` follows a strict design principle: **Diagnose first. Explain second. Fix safely.**
 
@@ -6,7 +6,7 @@ Unlike aggressive tools that rewrite code unpredictably, `qv fix` computes deter
 
 ---
 
-## 🚀 Basic Usage
+## 1. Basic Usage
 
 ```bash
 # Interactive wizard (prompts before applying each fix)
@@ -27,7 +27,7 @@ qv fix --sync -y
 
 ---
 
-## 🔒 Safety Guarantees & Remediation Levels
+## 2. Safety Guarantees & Remediation Levels
 
 `qv` classifies fixes into three safety categories:
 
@@ -39,7 +39,7 @@ qv fix --sync -y
 
 ---
 
-## 📋 Remediation Plan Inspection (`--dry-run`)
+## 3. Remediation Plan Inspection (Dry Run)
 
 Running `qv fix --dry-run` displays a table of planned actions and exact file diffs:
 
@@ -58,7 +58,7 @@ Dry-run mode enabled. No changes written to disk.
 
 ---
 
-## 🔄 Package Manager Auto-Sync (`--sync`)
+## 4. Package Manager Auto-Sync
 
 When dependencies are modified, running `qv fix --sync` automatically calls the detected package manager (`uv sync`, `poetry install`, `pip install`) to keep your active virtual environment in lockstep:
 

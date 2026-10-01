@@ -4,7 +4,7 @@
 
 ---
 
-## Official GitHub Action (`inzamol/qv`)
+## 1. Official GitHub Action (`inzamol/qv`)
 
 Use the official composite GitHub Action to run `qv` with automated PR annotations and step summaries:
 
@@ -28,9 +28,9 @@ jobs:
 
 ---
 
-## Custom CI Configuration
+## 2. Custom CI Configuration
 
-### Basic CI Check
+### 2.1 Basic CI Check
 
 Add a step to your `.github/workflows/ci.yml`:
 
@@ -52,7 +52,7 @@ jobs:
 
 ---
 
-### GitHub Code Scanning with SARIF
+### 2.2 GitHub Code Scanning with SARIF
 
 `qv` supports emitting findings in **SARIF v2.1.0** format for GitHub Advanced Security and Code Scanning:
 
@@ -84,7 +84,7 @@ jobs:
 
 ---
 
-## Pre-commit Integration
+## 3. Pre-commit Integration
 
 `qv` provides native pre-commit hooks via `.pre-commit-hooks.yaml`.
 
@@ -103,7 +103,7 @@ repos:
       # - id: qv-fix
 ```
 
-### Available Hooks
+### 3.1 Available Hooks
 
 | Hook ID | Description | Default Command |
 |---|---|---|
@@ -112,7 +112,7 @@ repos:
 
 ---
 
-## Exit Codes for CI Pipelines
+## 4. Exit Codes for CI Pipelines
 
 - `0`: Success — no blocking findings.
 - `1`: Failure — errors found (or warnings in `--strict` / `--ci` mode).

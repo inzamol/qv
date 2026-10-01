@@ -1,10 +1,10 @@
-# 🖥️ Interactive Terminal Explorer (TUI)
+# Interactive Terminal Explorer (TUI)
 
 `qv` provides a full-featured, interactive terminal dashboard for exploring diagnostic findings, inspecting evidence, switching between findings and live dependency trees, and applying remediation fixes with a single keystroke.
 
 ---
 
-## 🚀 Launching the TUI
+## 1. Launching the TUI
 
 Run `qv inspect` (or its alias `qv ui`) from your project root:
 
@@ -21,7 +21,7 @@ qv inspect --offline
 
 ---
 
-## 🎮 Interface & Layout
+## 2. Interface & Layout
 
 The dashboard splits into two primary panes alongside an informative header and controls footer:
 
@@ -42,17 +42,17 @@ The dashboard splits into two primary panes alongside an informative header and 
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1. Header Pane
+### 2.1 Header Pane
 Displays real-time project metrics:
 - **Project Name & Health Score**: Color-coded score gauge (Green $\ge 80$, Yellow $\ge 50$, Red $< 50$).
 - **Environment Metadata**: Active Python interpreter, detected package manager (`uv`, `poetry`, `pip`, `pdm`, `pipenv`), count of Errors, Warnings, and Checks Passed.
 
-### 2. Findings List Pane (Left)
+### 2.2 Findings List Pane (Left)
 - Shows all active diagnostics sorted by severity.
 - Smooth scrolling with visible indicators (`▲ ... more above ...` / `▼ ... more below ...`).
 - Selected item highlighted with active indicator (`👉`).
 
-### 3. Details Pane (Right)
+### 2.3 Details Pane (Right)
 - **Title & Severity**: Color-coded severity badge and rule ID.
 - **Location**: Exact file and line number where the issue originated.
 - **Root Cause & Message**: Contextual explanation of what went wrong.
@@ -62,7 +62,7 @@ Displays real-time project metrics:
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## 3. Keyboard Shortcuts
 
 | Shortcut | Description |
 |---|---|
@@ -75,9 +75,10 @@ Displays real-time project metrics:
 
 ---
 
-## 🛠️ One-Key Remediation (`f`)
+## 4. One-Key Remediation
 
 When a finding has a deterministic automated fix available (e.g. adding a missing dependency or removing an unused package):
+
 1. Navigate to the finding using `↑` or `↓`.
 2. Press **`f`**.
 3. `qv` will safely apply the change to your `pyproject.toml` or source code.
