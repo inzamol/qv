@@ -1,0 +1,17 @@
+- id: qv-scan
+  name: qv scan
+  description: Diagnose Python project health, dependencies, and environment consistency
+  entry: qv scan
+  language: python
+  types_or: [python, toml, yaml, dockerfile]
+  pass_filenames: false
+  always_run: true
+
+- id: qv-fix
+  name: qv fix
+  description: Automatically remediate safe Python project health issues
+  entry: qv fix -y
+  language: python
+  types_or: [python, toml]
+  pass_filenames: false
+  always_run: true

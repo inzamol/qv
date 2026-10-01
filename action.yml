@@ -1,0 +1,64 @@
+name: 'qv Python Health & Dependency Scanner'
+description: 'Diagnose Python project health, dependency conflicts, drift, security CVEs, and circular imports with actionable safe fixes.'
+author: 'Inzamul Hoque'
+
+inputs:
+  path:
+    description: 'Path to the Python project directory to scan'
+    required: false
+    default: '.'
+  strict:
+    description: 'Promote warnings to errors (fails workflow on warnings)'
+    required: false
+    default: 'false'
+  offline:
+    description: 'Disable remote vulnerability/CVE queries'
+    required: false
+    default: 'false'
+  sarif:
+    description: 'Generate SARIF v2.1.0 output file for GitHub Code Scanning'
+    required: false
+    default: 'false'
+  sarif-file:
+    description: 'Output filename for SARIF report'
+    required: false
+    default: 'qv-results.sarif'
+  html-report:
+    description: 'Generate self-contained HTML dashboard'
+    required: false
+    default: 'false'
+  html-file:
+    description: 'Output filename for HTML report'
+    required: false
+    default: 'qv-report.html'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+
+    - name: Run qv scan
+      shell: bash
+      run: |
+        ARGS="--ci --github-annotations"
+        if [ "${{ inputs.strict }}" = "true" ]; then
+          ARGS="$ARGS --strict"
+        fi
+        if [ "${{ inputs.offline }}" = "true" ]; then
+          ARGS="$ARGS --offline"
+        fi
+        if [ "${{ inputs.sarif }}" = "true" ]; then
+          ARGS="$ARGS --sarif -o ${{ inputs.sarif-file }}"
+        fi
+        if [ "${{ inputs.html-report }}" = "true" ]; then
+          ARGS="$ARGS --html ${{ inputs.html-file }}"
+        fi
+
+        uv run qv scan "${{ inputs.path }}" $ARGS
+
+branding:
+  icon: 'activity'
+  color: 'blue'

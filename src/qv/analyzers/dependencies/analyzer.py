@@ -201,7 +201,7 @@ class DependencyAnalyzer:
             context.project_name.lower(),
         }
         for sf in context.source_files:
-            parts = sf.relative_path.parts
+            parts = list(sf.relative_path.parts)
             if parts:
                 if parts[0] in ("src", "lib") and len(parts) > 1:
                     local_modules.add(parts[1].replace(".py", "").lower().replace("-", "_"))

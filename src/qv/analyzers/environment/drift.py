@@ -87,9 +87,36 @@ class EnvironmentAnalyzer:
             return diagnostics
 
         docker_py = context.docker.base_python_version
+        target_python = context.config.get("target_python")
         active_py = f"{context.python_runtime.major}.{context.python_runtime.minor}"
 
-        if docker_py != active_py:
+        is_drift = False
+        mismatch_msg = ""
+        target_source = "pyproject.toml"
+        expected_py = active_py
+
+        if target_python:
+            try:
+                spec = SpecifierSet(
+                    target_python
+                    if any(c in target_python for c in "<>=~!")
+                    else f"=={target_python}.*"
+                )
+                if not spec.contains(Version(docker_py)):
+                    is_drift = True
+                    mismatch_msg = f"Dockerfile base image uses Python {docker_py}, which does not satisfy project target Python {target_python}."
+                    expected_py = target_python.lstrip("<>=~!")
+            except Exception:
+                if docker_py != active_py:
+                    is_drift = True
+                    mismatch_msg = f"Dockerfile base image uses Python {docker_py}, while local runtime is {active_py}."
+                    target_source = "Local environment"
+        elif docker_py != active_py:
+            is_drift = True
+            mismatch_msg = f"Dockerfile base image uses Python {docker_py}, while local runtime is {active_py}."
+            target_source = "Local environment"
+
+        if is_drift:
             rel_docker = (
                 context.docker.dockerfile_path.relative_to(context.project_root)
                 if context.docker.dockerfile_path
@@ -102,21 +129,21 @@ class EnvironmentAnalyzer:
                     severity=rule.default_severity,
                     category=rule.category,
                     title=rule.title,
-                    message=f"Dockerfile base image uses Python {docker_py}, while local runtime is {active_py}.",
+                    message=mismatch_msg,
                     evidence=[
                         Evidence(
                             fact=f"Dockerfile base image: {context.docker.base_image}",
                             source=str(rel_docker),
                         ),
                         Evidence(
-                            fact=f"Local Python version: {context.python_runtime.version_str}",
-                            source="Local environment",
+                            fact=f"Target Python version: {target_python or active_py}",
+                            source=target_source,
                         ),
                     ],
                     suggestions=[
                         Suggestion(
-                            description=f"Update base image in {rel_docker} to use python:{active_py}-slim.",
-                            code_snippet=f"FROM python:{active_py}-slim",
+                            description=f"Update base image in {rel_docker} to use python:{expected_py}-slim.",
+                            code_snippet=f"FROM python:{expected_py}-slim",
                         )
                     ],
                     file=str(rel_docker),

@@ -229,7 +229,24 @@ jobs:
         if: always()
 ```
 
-👉 *See full details in [CI/CD Integration](docs/ci_integration.md).*
+### Pre-commit Hook Integration
+
+Add `qv` directly to your `.pre-commit-config.yaml` to prevent committing unhealthy dependencies:
+
+```yaml
+repos:
+  - repo: https://github.com/inzamol/qv
+    rev: v0.1.0
+    hooks:
+      # Diagnose health before committing
+      - id: qv-scan
+        args: [--strict, --offline]
+
+      # Optional: Auto-remediate safe issues on commit
+      # - id: qv-fix
+```
+
+👉 *See full details in [CI/CD & Pre-commit Integration](docs/ci_integration.md).*
 
 ---
 

@@ -35,6 +35,8 @@ qv scan [PATH] [OPTIONS]
 | `--ci` | Runs non-interactively with strict mode enabled |
 | `--json` | Emits scan results as structured JSON |
 | `--sarif` | Emits scan results as standard SARIF v2.1.0 format |
+| `--html <FILE>` | Generates an interactive, standalone HTML dashboard |
+| `--github-annotations` | Emits GitHub Actions inline PR workflow annotations |
 | `--offline` | Disables remote vulnerability/CVE queries (airgapped mode) |
 | `--output`, `-o <FILE>` | Writes output directly to a file |
 
@@ -46,6 +48,28 @@ qv scan [PATH] [OPTIONS]
 | `1` | Blocking findings detected |
 | `2` | Invalid configuration or unknown rule ID |
 | `3` | Analysis or runtime failure |
+
+---
+
+## `qv inspect` (alias: `qv ui`)
+
+Launches an interactive terminal dashboard (TUI) to navigate findings, expand evidence, view dependency trees, and apply fixes interactively with keyboard shortcuts.
+
+```bash
+qv inspect [PATH] [OPTIONS]
+qv ui [PATH] [OPTIONS]
+```
+
+### Controls
+
+| Key | Action |
+|---|---|
+| `↑` / `k` | Navigate to previous finding |
+| `↓` / `j` | Navigate to next finding |
+| `Enter` / `Space` | Toggle details expansion |
+| `f` | Apply remediation fix for selected finding |
+| `t` | Switch between Diagnostics and Dependency Tree view |
+| `q` / `Esc` | Exit interactive explorer |
 
 ---
 

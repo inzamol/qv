@@ -19,12 +19,26 @@ uv sync --extra dev
 ```
 
 ### 2. Run Tests
-
+ 
 ```bash
 uv run pytest
 ```
 
-### 3. Lint & Format
+### 3. Multi-Environment Matrix Testing (Tox)
+
+Run tests, linting, and typechecking locally across all environments before submitting a PR:
+
+```bash
+# Run all configured tox environments
+uv run tox
+
+# Or run specific test environments
+uv run tox -e py312
+uv run tox -e lint
+uv run tox -e typecheck
+```
+
+### 4. Lint & Format
 
 ```bash
 uv run ruff check .

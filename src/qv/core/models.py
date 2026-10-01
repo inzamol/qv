@@ -92,6 +92,22 @@ class ScanResult(BaseModel):
     def has_blocking_errors(self) -> bool:
         return self.summary.errors_count > 0
 
+    @property
+    def health_score(self) -> int:
+        return self.summary.health_score
+
+    @property
+    def error_count(self) -> int:
+        return self.summary.errors_count
+
+    @property
+    def warning_count(self) -> int:
+        return self.summary.warnings_count
+
+    @property
+    def checks_passed(self) -> int:
+        return self.summary.checks_passed
+
     @classmethod
     def create(
         cls,

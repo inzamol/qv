@@ -19,18 +19,21 @@ from qv.core.engine import AnalysisEngine
 from qv.core.models import Severity
 from qv.core.project import ProjectDiscovery
 from qv.remediation.engine import RemediationEngine
+from qv.reporters.github_annotator import GitHubAnnotator
+from qv.reporters.html_reporter import HtmlReporter
 from qv.reporters.json_reporter import JsonReporter
 from qv.reporters.sarif import SarifReporter
 from qv.reporters.terminal import TerminalReporter
 from qv.rules.registry import RULES_CATALOG, get_rule_definition
+from qv.tui.app import TuiExplorer
 from qv.visualizers.tree import TreeVisualizer
 
 if sys.platform == "win32":
     try:
         if sys.stdout and hasattr(sys.stdout, "reconfigure"):
-            sys.stdout.reconfigure(encoding="utf-8")
+            sys.stdout.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
         if sys.stderr and hasattr(sys.stderr, "reconfigure"):
-            sys.stderr.reconfigure(encoding="utf-8")
+            sys.stderr.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
     except Exception:
         pass
 
@@ -62,6 +65,17 @@ def cli() -> None:
 @click.option(
     "--offline", is_flag=True, help="Disable remote vulnerability/CVE queries (airgapped mode)."
 )
+@click.option(
+    "--html",
+    "html_output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Generate interactive HTML dashboard report.",
+)
+@click.option(
+    "--github-annotations",
+    is_flag=True,
+    help="Emit GitHub Actions inline workflow command annotations.",
+)
 def scan(
     path: Path,
     strict: bool,
@@ -70,6 +84,8 @@ def scan(
     as_sarif: bool,
     output: Path | None,
     offline: bool,
+    html_output: Path | None,
+    github_annotations: bool,
 ) -> None:
     """Scan a Python project and report health findings."""
     try:
@@ -85,6 +101,19 @@ def scan(
 
         engine = AnalysisEngine(config=config)
         result = engine.run(context)
+
+        # Handle GitHub annotations & step summaries
+        if github_annotations or ci_mode:
+            annotator = GitHubAnnotator()
+            if github_annotations:
+                annotator.emit_annotations(result)
+            annotator.write_step_summary(result)
+
+        # Handle HTML report output
+        if html_output:
+            html_content = HtmlReporter().render(result)
+            html_output.write_text(html_content, encoding="utf-8")
+            console.print(f"[green]HTML report successfully written to {html_output}[/green]")
 
         # Select reporter
         if as_sarif:
@@ -496,6 +525,47 @@ def graph_cmd(
         max_depth=max_depth,
         as_json=as_json,
     )
+
+
+@cli.command("inspect")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option("--offline", is_flag=True, help="Disable remote vulnerability/CVE queries.")
+def inspect_cmd(path: Path, offline: bool) -> None:
+    """Launch interactive terminal dashboard (TUI) to explore diagnostics and fixes."""
+    try:
+        pyproject_path = path / "pyproject.toml"
+        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
+        if offline:
+            config.offline = True
+
+        discovery = ProjectDiscovery(root=path, config=config)
+        context = discovery.discover_context()
+
+        engine = AnalysisEngine(config=config)
+        result = engine.run(context)
+
+        explorer = TuiExplorer(result=result, console=console)
+        explorer.run()
+    except Exception as e:
+        console.print(f"[bold red]Error running interactive inspector: {e}[/bold red]")
+        sys.exit(3)
+
+
+@cli.command("ui")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option("--offline", is_flag=True, help="Disable remote vulnerability/CVE queries.")
+@click.pass_context
+def ui_cmd(ctx: click.Context, path: Path, offline: bool) -> None:
+    """Alias for 'qv inspect' command."""
+    ctx.invoke(inspect_cmd, path=path, offline=offline)
 
 
 @cli.command("version")
