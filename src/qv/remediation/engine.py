@@ -204,11 +204,7 @@ class RemediationEngine:
 
             formatted_deps = "\n".join(f'    "{item}",' for item in existing_items)
             new_dep_block = f"dependencies = [\n{formatted_deps}\n]"
-            updated = (
-                content[: dep_match.start()]
-                + new_dep_block
-                + content[dep_match.end() :]
-            )
+            updated = content[: dep_match.start()] + new_dep_block + content[dep_match.end() :]
             pyproject_file.write_text(updated, encoding="utf-8")
         elif "[project]" in content:
             # Insert dependencies array under [project]
@@ -249,11 +245,7 @@ class RemediationEngine:
                 new_dep_block = f"dependencies = [\n{formatted_deps}\n]"
             else:
                 new_dep_block = "dependencies = []"
-            updated = (
-                content[: dep_match.start()]
-                + new_dep_block
-                + content[dep_match.end() :]
-            )
+            updated = content[: dep_match.start()] + new_dep_block + content[dep_match.end() :]
             pyproject_file.write_text(updated, encoding="utf-8")
 
     def _add_dependency_to_requirements(self, package: str) -> None:

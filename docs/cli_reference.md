@@ -77,6 +77,38 @@ qv fix -y
 
 ---
 
+## `qv tree` / `qv graph`
+
+Visualizes direct vs transitive package dependencies and internal source module import architecture (with circular import cycles highlighted).
+
+```bash
+qv tree [PATH] [OPTIONS]
+```
+
+### Options
+
+| Option | Description |
+|---|---|
+| `-d`, `--dependencies` | Visualizes direct and transitive package dependencies |
+| `-i`, `--imports` | Visualizes internal Python module imports and circular cycles |
+| `-L`, `--depth <N>` | Maximum depth level for the tree (default: 5) |
+| `--json` | Emits dependency and import statistics as JSON |
+
+Example:
+
+```bash
+# View full project tree (dependencies and imports)
+qv tree
+
+# View only internal module import hierarchy and circular loops
+qv tree --imports
+
+# View dependency tree up to 2 levels deep
+qv tree -d -L 2
+```
+
+---
+
 ## `qv explain`
 
 Displays detailed explanations, evidence requirements, and remediation instructions for a rule.

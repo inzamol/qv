@@ -12,6 +12,22 @@ from qv.core.context import ProjectContext
 from qv.core.models import Diagnostic, Evidence, Suggestion
 from qv.rules.registry import get_rule_definition
 
+PEP594_REMOVED_MODULES = {
+    "distutils",
+    "imp",
+    "cgi",
+    "pipes",
+    "asyncore",
+    "asynchat",
+    "smtpd",
+    "crypt",
+    "chunk",
+    "telnetlib",
+    "mailcap",
+    "nntplib",
+    "audioop",
+}
+
 # Known Python standard library modules (Python 3.10+)
 STDLIB_MODULES = (
     set(sys.stdlib_module_names)
@@ -70,7 +86,7 @@ STDLIB_MODULES = (
         "zipfile",
         "__future__",
     }
-)
+) | PEP594_REMOVED_MODULES
 
 # Known tools/packages that may not be imported directly in application code
 IGNORED_UNUSED = {

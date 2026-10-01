@@ -124,6 +124,24 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         remediation_hint="Verify the module name and ensure source directory is marked on the PYTHONPATH or package root.",
         doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#imp-002--unresolved-local-import",
     ),
+    "IMP-003": RuleDefinition(
+        id="IMP-003",
+        category="architecture",
+        title="Unused / orphan local module",
+        description="A Python source file exists in the project but is never imported or referenced by any other module, entry point, or test file.",
+        default_severity=Severity.WARNING,
+        remediation_hint="Review if this module is obsolete and can be safely deleted or integrated into your package exports.",
+        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#imp-003--unused-orphan-local-module",
+    ),
+    "IMP-004": RuleDefinition(
+        id="IMP-004",
+        category="compatibility",
+        title="Deprecated or removed standard library module",
+        description="A standard library module imported in source code was deprecated or completely removed in modern Python (PEP 594).",
+        default_severity=Severity.ERROR,
+        remediation_hint="Replace the removed stdlib module with its modern replacement (e.g. importlib instead of imp, subprocess instead of pipes).",
+        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#imp-004--deprecated-or-removed-standard-library-module",
+    ),
     # Packaging rules
     "PKG-001": RuleDefinition(
         id="PKG-001",

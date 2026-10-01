@@ -14,6 +14,8 @@ This directory contains standalone example projects demonstrating all diagnostic
 | **[`unresolved_imports/`](./unresolved_imports)** | `IMP-002` | Architecture | Code imports `from app.auth.missing_token import verify_token`, which does not exist. | ℹ️ Code Edit |
 | **[`missing_metadata/`](./missing_metadata)** | `PKG-001` | Packaging | Bare `pyproject.toml` missing the required PEP 621 `[project]` metadata table. | ✅ Yes |
 | **[`environment_drift/`](./environment_drift)** | `ENV-002`, `ENV-003` | Environment | Target Python is `>=3.12`, but Dockerfile uses `3.10` and CI matrix runs `3.9`. | ℹ️ Docker/CI Config |
+| **[`dead_modules/`](./dead_modules)** | `IMP-003` | Architecture | `unused_legacy_module.py` exists in source code but is never imported anywhere. | ℹ️ Dead Code Removal |
+| **[`deprecated_stdlib/`](./deprecated_stdlib)** | `IMP-004` | Compatibility | Code imports removed stdlib modules (`imp`, `distutils`, `cgi`, `pipes` in Python 3.12/3.13). | ℹ️ Modernization |
 | **[`all_in_one_unhealthy/`](./all_in_one_unhealthy)** | Multiple | All | Realistic messy project containing missing deps, unused deps, circular imports, and container drift. | ✅ Yes |
 
 ---
@@ -68,7 +70,19 @@ qv fix examples/missing_metadata -y
 qv scan examples/environment_drift
 ```
 
-### 7. Test All-in-One Unhealthy Project
+### 7. Test Dead / Orphan Local Modules (`IMP-003`)
+```bash
+# Scan and detect dead unused source modules
+qv scan examples/dead_modules
+```
+
+### 8. Test Deprecated/Removed Python 3.11-3.13 Stdlib Modules (`IMP-004`)
+```bash
+# Scan and detect PEP 594 removed stdlib modules (imp, distutils, cgi, pipes)
+qv scan examples/deprecated_stdlib
+```
+
+### 9. Test All-in-One Unhealthy Project
 ```bash
 # Full health report across all subsystems
 qv scan examples/all_in_one_unhealthy

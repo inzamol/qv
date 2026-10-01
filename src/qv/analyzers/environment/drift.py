@@ -133,7 +133,49 @@ class EnvironmentAnalyzer:
         if not rule or not context.ci.has_ci or not context.ci.matrix_python_versions:
             return diagnostics
 
+        target_python = context.config.get("target_python")
         active_major_minor = f"{context.python_runtime.major}.{context.python_runtime.minor}"
+
+        if target_python:
+            try:
+                spec = SpecifierSet(
+                    target_python
+                    if any(c in target_python for c in "<>=~!")
+                    else f"=={target_python}.*"
+                )
+                incompatible_ci = [
+                    v for v in context.ci.matrix_python_versions if not spec.contains(Version(v))
+                ]
+                if incompatible_ci:
+                    diagnostics.append(
+                        Diagnostic(
+                            id=rule.id,
+                            severity=rule.default_severity,
+                            category=rule.category,
+                            title=rule.title,
+                            message=f"CI matrix versions ({', '.join(incompatible_ci)}) do not satisfy project target Python ({target_python}).",
+                            evidence=[
+                                Evidence(
+                                    fact=f"CI test matrix versions: {', '.join(context.ci.matrix_python_versions)}",
+                                    source="CI workflows",
+                                ),
+                                Evidence(
+                                    fact=f"Target Python specification: {target_python}",
+                                    source="pyproject.toml",
+                                ),
+                            ],
+                            suggestions=[
+                                Suggestion(
+                                    description=f"Update CI matrix to include versions satisfying '{target_python}'.",
+                                )
+                            ],
+                            doc_url=rule.doc_url,
+                        )
+                    )
+                    return diagnostics
+            except Exception:
+                pass
+
         if active_major_minor not in context.ci.matrix_python_versions:
             diagnostics.append(
                 Diagnostic(

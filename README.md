@@ -144,6 +144,11 @@ qv fix              # Interactive fix wizard
 qv fix --dry-run    # Preview fixes and diffs
 qv fix -y           # Apply all safe fixes automatically
 
+# Visualize dependencies & import architecture
+qv tree             # Full visual tree
+qv tree --imports   # View circular imports in module graph
+qv tree -d -L 2     # Direct and transitive dependencies
+
 # Explain a rule
 qv explain DEP-002
 

@@ -92,3 +92,27 @@ def test_all_in_one_unhealthy_example():
     assert "DEP-003" in rule_ids
     assert "IMP-001" in rule_ids
     assert "ENV-002" in rule_ids
+
+
+def test_dead_modules_example():
+    root = Path(__file__).parent.parent / "examples" / "dead_modules"
+    config = QvConfig()
+    context = ProjectDiscovery(root=root, config=config).discover_context()
+    result = AnalysisEngine(config=config).run(context)
+
+    rule_ids = [d.id for d in result.diagnostics]
+    assert "IMP-003" in rule_ids
+    orphan_diag = next(d for d in result.diagnostics if d.id == "IMP-003")
+    assert "unused_legacy_module" in orphan_diag.message
+
+
+def test_deprecated_stdlib_example():
+    root = Path(__file__).parent.parent / "examples" / "deprecated_stdlib"
+    config = QvConfig()
+    context = ProjectDiscovery(root=root, config=config).discover_context()
+    result = AnalysisEngine(config=config).run(context)
+
+    rule_ids = [d.id for d in result.diagnostics]
+    assert "IMP-004" in rule_ids
+    assert any("distutils" in d.message for d in result.diagnostics)
+    assert any("imp" in d.message for d in result.diagnostics)

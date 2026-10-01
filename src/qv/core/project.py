@@ -59,6 +59,8 @@ class ProjectDiscovery:
             package_manager = "pipenv"
             lock_files.append(self.root / "Pipfile.lock")
 
+        target_python = self.config.target_python
+
         # Check pyproject.toml
         if pyproject_path.exists():
             manifest_files.append(pyproject_path)
@@ -69,6 +71,10 @@ class ProjectDiscovery:
                 # Name
                 if "project" in pyproject_data and "name" in pyproject_data["project"]:
                     project_name = pyproject_data["project"]["name"]
+
+                # Target Python
+                if not target_python and "project" in pyproject_data:
+                    target_python = pyproject_data["project"].get("requires-python")
 
                 # Dependencies from [project.dependencies]
                 for dep_str in pyproject_data.get("project", {}).get("dependencies", []):
@@ -270,6 +276,7 @@ class ProjectDiscovery:
             imports=tuple(imports),
             docker=docker_config,
             ci=ci_config,
+            config={"target_python": target_python} if target_python else {},
         )
 
     def _discover_docker(self) -> DockerConfig:

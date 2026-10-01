@@ -108,7 +108,7 @@ class QvConfig:
         )
 
         runtime_dict = tool_config.get("runtime", {})
-        target_python = runtime_dict.get("python")
+        target_python = runtime_dict.get("python") or data.get("project", {}).get("requires-python")
 
         return cls(
             rules=rules,

@@ -23,6 +23,7 @@ from qv.reporters.json_reporter import JsonReporter
 from qv.reporters.sarif import SarifReporter
 from qv.reporters.terminal import TerminalReporter
 from qv.rules.registry import RULES_CATALOG, get_rule_definition
+from qv.visualizers.tree import TreeVisualizer
 
 if sys.platform == "win32":
     try:
@@ -362,6 +363,9 @@ def fix_cmd(
 
         sys.exit(0)
 
+    except (click.Abort, KeyboardInterrupt):
+        console.print("\n[yellow]Remediation cancelled.[/yellow]")
+        sys.exit(0)
     except click.ClickException:
         raise
     except SystemExit:
@@ -369,6 +373,123 @@ def fix_cmd(
     except Exception as e:
         console.print(f"[bold red]Remediation failed:[/bold red] {e}")
         sys.exit(3)
+
+
+@cli.command("tree")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--imports",
+    "-i",
+    "show_imports",
+    is_flag=True,
+    help="Visualize internal source module imports and circular cycles.",
+)
+@click.option(
+    "--dependencies",
+    "-d",
+    "show_dependencies",
+    is_flag=True,
+    help="Visualize direct and transitive package dependencies.",
+)
+@click.option(
+    "--depth",
+    "-L",
+    "max_depth",
+    type=int,
+    default=5,
+    help="Maximum depth level for the tree (default: 5).",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Emit dependency and module statistics as structured JSON.",
+)
+def tree_cmd(
+    path: Path,
+    show_imports: bool,
+    show_dependencies: bool,
+    max_depth: int,
+    as_json: bool,
+) -> None:
+    """Visualize dependency trees and import architecture."""
+    try:
+        pyproject_path = path / "pyproject.toml"
+        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
+        discovery = ProjectDiscovery(root=path, config=config)
+        context = discovery.discover_context()
+
+        visualizer = TreeVisualizer(context=context)
+
+        if as_json:
+            import json
+
+            click.echo(json.dumps(visualizer.to_dict(), indent=2))
+            sys.exit(0)
+
+        # If user explicitly requested imports
+        if show_imports and not show_dependencies:
+            console.print("\n[bold cyan]Internal Module Import Architecture[/bold cyan]\n")
+            console.print(visualizer.build_import_tree(max_depth=max_depth))
+            console.print()
+        # If user explicitly requested dependencies
+        elif show_dependencies and not show_imports:
+            console.print("\n[bold cyan]Dependency Hierarchy[/bold cyan]\n")
+            console.print(visualizer.build_dependency_tree(max_depth=max_depth))
+            console.print()
+        else:
+            # Default: show dependency tree, and if circular imports exist, show import tree
+            console.print("\n[bold cyan]Dependency Hierarchy[/bold cyan]\n")
+            console.print(visualizer.build_dependency_tree(max_depth=max_depth))
+            console.print("\n[bold cyan]Internal Module Import Architecture[/bold cyan]\n")
+            console.print(visualizer.build_import_tree(max_depth=max_depth))
+            console.print()
+
+        sys.exit(0)
+
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Tree visualization failed:[/bold red] {e}")
+        sys.exit(3)
+
+
+@cli.command("graph")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option("--imports", "-i", "show_imports", is_flag=True, help="Show import graph.")
+@click.option(
+    "--dependencies", "-d", "show_dependencies", is_flag=True, help="Show dependency graph."
+)
+@click.option("--depth", "-L", "max_depth", type=int, default=5, help="Maximum tree depth.")
+@click.option("--json", "as_json", is_flag=True, help="Output JSON.")
+@click.pass_context
+def graph_cmd(
+    ctx: click.Context,
+    path: Path,
+    show_imports: bool,
+    show_dependencies: bool,
+    max_depth: int,
+    as_json: bool,
+) -> None:
+    """Alias for 'qv tree' command."""
+    ctx.invoke(
+        tree_cmd,
+        path=path,
+        show_imports=show_imports,
+        show_dependencies=show_dependencies,
+        max_depth=max_depth,
+        as_json=as_json,
+    )
 
 
 @cli.command("version")

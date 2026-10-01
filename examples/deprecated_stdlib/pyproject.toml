@@ -1,0 +1,6 @@
+[project]
+name = "deprecated-stdlib-example"
+version = "0.1.0"
+description = "Example project demonstrating IMP-004 PEP 594 deprecated stdlib detection."
+requires-python = ">=3.12"
+dependencies = []

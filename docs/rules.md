@@ -69,6 +69,16 @@
 - **Description:** A local module imported in source code could not be resolved on the project's Python path.
 - **Remediation:** Check the module name and ensure source directories are on the Python path or package root.
 
+### `IMP-003` — Unused / Orphan Local Module
+- **Default Severity:** `WARNING`
+- **Description:** A Python source file exists in the project but is never imported or referenced by any other module, entry point, or test file.
+- **Remediation:** Review if the module is dead/obsolete and can be safely removed, or export it in package `__init__.py`.
+
+### `IMP-004` — Deprecated or Removed Standard Library Module
+- **Default Severity:** `ERROR`
+- **Description:** A standard library module imported in source code was deprecated or removed in modern Python 3.11-3.13 (PEP 594).
+- **Remediation:** Replace the removed stdlib module with its modern replacement (e.g. `importlib` instead of `imp`, `subprocess` instead of `pipes`).
+
 ---
 
 ## 📄 Packaging Rules

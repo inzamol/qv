@@ -3,24 +3,97 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Any
 
 from qv.core.context import ProjectContext
-from qv.core.models import Diagnostic, Evidence, Suggestion
+from qv.core.models import Diagnostic, Evidence, Severity, Suggestion
 from qv.rules.registry import get_rule_definition
+
+DEPRECATED_STDLIB_REGISTRY: dict[str, dict[str, Any]] = {
+    "distutils": {
+        "deprecated": (3, 10),
+        "removed": (3, 12),
+        "replacement": "Use 'setuptools', 'packaging', or 'sysconfig' instead of 'distutils'.",
+    },
+    "imp": {
+        "deprecated": (3, 4),
+        "removed": (3, 12),
+        "replacement": "Use 'importlib' instead of deprecated 'imp'.",
+    },
+    "cgi": {
+        "deprecated": (3, 11),
+        "removed": (3, 13),
+        "replacement": "Use 'urllib.parse', 'multipart', or 'email.message' instead of 'cgi'.",
+    },
+    "pipes": {
+        "deprecated": (3, 11),
+        "removed": (3, 13),
+        "replacement": "Use 'subprocess' instead of 'pipes'.",
+    },
+    "asyncore": {
+        "deprecated": (3, 6),
+        "removed": (3, 12),
+        "replacement": "Use 'asyncio' instead of 'asyncore'.",
+    },
+    "asynchat": {
+        "deprecated": (3, 6),
+        "removed": (3, 12),
+        "replacement": "Use 'asyncio' instead of 'asynchat'.",
+    },
+    "smtpd": {
+        "deprecated": (3, 6),
+        "removed": (3, 12),
+        "replacement": "Use 'aiosmtpd' instead of 'smtpd'.",
+    },
+    "crypt": {
+        "deprecated": (3, 11),
+        "removed": (3, 13),
+        "replacement": "Use 'hashlib', 'bcrypt', or 'passlib' instead of 'crypt'.",
+    },
+    "chunk": {
+        "deprecated": (3, 11),
+        "removed": (3, 13),
+        "replacement": "Replace 'chunk' with custom binary stream parsing.",
+    },
+    "telnetlib": {
+        "deprecated": (3, 11),
+        "removed": (3, 13),
+        "replacement": "Use 'telnetlib3' or third-party async telnet client.",
+    },
+    "mailcap": {
+        "deprecated": (3, 11),
+        "removed": (3, 13),
+        "replacement": "Use 'mimetypes' instead of 'mailcap'.",
+    },
+    "nntplib": {
+        "deprecated": (3, 11),
+        "removed": (3, 13),
+        "replacement": "Use a third-party NNTP client library.",
+    },
+    "audioop": {
+        "deprecated": (3, 11),
+        "removed": (3, 13),
+        "replacement": "Use 'wave', 'scipy.io.wavfile', or 'pydub' instead of 'audioop'.",
+    },
+}
 
 
 class ImportAnalyzer:
-    """Analyzes import graphs for circular dependencies and unresolved local imports."""
+    """Analyzes import graphs for circular dependencies, unresolved local imports, dead modules, and stdlib deprecations."""
 
     id = "imports"
     name = "Import & Architecture Analyzer"
-    description = "Detects circular imports and unresolved internal modules."
+    description = (
+        "Detects circular imports, unresolved internal modules, dead code, and deprecated stdlibs."
+    )
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
 
         diagnostics.extend(self._check_circular_imports(context))
         diagnostics.extend(self._check_unresolved_local_imports(context))
+        diagnostics.extend(self._check_dead_modules(context))
+        diagnostics.extend(self._check_deprecated_stdlib(context))
 
         return diagnostics
 
@@ -156,5 +229,127 @@ class ImportAnalyzer:
                             doc_url=rule.doc_url,
                         )
                     )
+
+        return diagnostics
+
+    def _check_dead_modules(self, context: ProjectContext) -> list[Diagnostic]:
+        """IMP-003: Detect orphan local source modules never imported or referenced."""
+        diagnostics: list[Diagnostic] = []
+        rule = get_rule_definition("IMP-003")
+        if not rule or not context.source_files:
+            return diagnostics
+
+        imported_module_names: set[str] = set()
+        for imp in context.imports:
+            if imp.module_name:
+                imported_module_names.add(imp.module_name)
+                parts = imp.module_name.split(".")
+                for i in range(1, len(parts) + 1):
+                    imported_module_names.add(".".join(parts[:i]))
+
+        entrypoint_names = {
+            "__init__",
+            "__main__",
+            "main",
+            "app",
+            "cli",
+            "conftest",
+            "wsgi",
+            "asgi",
+            "server",
+            "setup",
+        }
+
+        for sf in context.source_files:
+            rel_str = str(sf.relative_path).replace("\\", "/")
+            stem = sf.path.stem
+
+            if "test" in rel_str.lower() or stem.startswith("test_") or stem.endswith("_test"):
+                continue
+
+            if sf.is_init or stem in entrypoint_names or "__main__" in sf.content:
+                continue
+
+            if sf.module_name not in imported_module_names and stem not in imported_module_names:
+                diagnostics.append(
+                    Diagnostic(
+                        id=rule.id,
+                        severity=rule.default_severity,
+                        category=rule.category,
+                        title=f"Unused / orphan local module: {sf.module_name}",
+                        message=f"Module '{sf.module_name}' ({rel_str}) is not imported by any other module in the project.",
+                        evidence=[
+                            Evidence(
+                                fact=f"Source file {rel_str} exists but no import statements target '{sf.module_name}'",
+                                source=rel_str,
+                            )
+                        ],
+                        suggestions=[
+                            Suggestion(
+                                description=f"Review if {rel_str} is obsolete and can be deleted, or export/import it where needed.",
+                                is_safe=False,
+                            )
+                        ],
+                        file=rel_str,
+                        doc_url=rule.doc_url,
+                    )
+                )
+
+        return diagnostics
+
+    def _check_deprecated_stdlib(self, context: ProjectContext) -> list[Diagnostic]:
+        """IMP-004: Detect deprecated or removed standard library modules (PEP 594)."""
+        diagnostics: list[Diagnostic] = []
+        rule = get_rule_definition("IMP-004")
+        if not rule or not context.imports:
+            return diagnostics
+
+        py_version = (context.python_runtime.major, context.python_runtime.minor)
+
+        for imp in context.imports:
+            top_level = imp.module_name.split(".")[0]
+            dep_info = DEPRECATED_STDLIB_REGISTRY.get(top_level)
+            if not dep_info:
+                continue
+
+            rel_path = (
+                imp.source_file.relative_to(context.project_root)
+                if imp.source_file.is_relative_to(context.project_root)
+                else imp.source_file
+            )
+
+            removed_ver = dep_info["removed"]
+            is_removed = py_version >= removed_ver
+            sev = Severity.ERROR if is_removed else Severity.WARNING
+            status_text = (
+                f"removed in Python {removed_ver[0]}.{removed_ver[1]}"
+                if is_removed
+                else f"deprecated in Python {dep_info['deprecated'][0]}.{dep_info['deprecated'][1]} and will be removed in Python {removed_ver[0]}.{removed_ver[1]}"
+            )
+
+            diagnostics.append(
+                Diagnostic(
+                    id=rule.id,
+                    severity=sev,
+                    category=rule.category,
+                    title=f"Deprecated/removed stdlib module: {top_level}",
+                    message=f"Standard library module '{top_level}' was {status_text}. Active runtime is {context.python_runtime.version_str}.",
+                    evidence=[
+                        Evidence(
+                            fact=f"Imported '{top_level}' at {rel_path}:{imp.line_number}",
+                            source=str(rel_path),
+                        )
+                    ],
+                    suggestions=[
+                        Suggestion(
+                            description=dep_info["replacement"],
+                            is_safe=False,
+                        )
+                    ],
+                    file=str(rel_path),
+                    line=imp.line_number,
+                    doc_url=rule.doc_url,
+                )
+            )
 
         return diagnostics
