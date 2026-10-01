@@ -9,7 +9,7 @@
 [![CI Status](https://github.com/inzamol/qv/actions/workflows/ci.yml/badge.svg)](https://github.com/inzamol/qv/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-[Installation](#-installation) • [Quick Start](#-quick-start) • [Interactive TUI](#-interactive-tui-explorer) • [Features](#-what-it-detects) • [CLI Commands](#-cli-commands) • [CI/CD Integration](#-cicd-integration) • [Documentation](docs/getting_started.md)
+[Installation](#-installation) • [Quick Start](#-quick-start) • [Interactive TUI](#-interactive-tui-explorer) • [Features](#-what-it-detects) • [CLI Commands](#-cli-commands) • [CI/CD Integration](#-cicd-integration) • [Documentation](https://inzamol.github.io/qv/)
 
 </div>
 
@@ -444,13 +444,14 @@ repos:
 ---
 
 ## 📚 Complete Documentation
+Online documentation is available at **[inzamol.github.io/qv](https://inzamol.github.io/qv/)**.
 
-- 🚀 [Getting Started Guide](docs/getting_started.md)
-- 📖 [CLI Reference](docs/cli_reference.md)
-- 📋 [Diagnostic Rules Catalog](docs/rules.md)
-- ⚙️ [Configuration Guide](docs/configuration.md)
-- 🤖 [CI/CD & SARIF Integration](docs/ci_integration.md)
-- 🤝 [Contributing Guidelines](docs/contributing.md)
+- 🚀 [Getting Started Guide](https://inzamol.github.io/qv/getting_started/)
+- 📖 [CLI Reference](https://inzamol.github.io/qv/cli_reference/)
+- 📋 [Diagnostic Rules Catalog](https://inzamol.github.io/qv/rules/)
+- ⚙️ [Configuration Guide](https://inzamol.github.io/qv/configuration/)
+- 🤖 [CI/CD & SARIF Integration](https://inzamol.github.io/qv/ci_integration/)
+- 🤝 [Contributing Guidelines](https://inzamol.github.io/qv/contributing/)
 
 ---
 
