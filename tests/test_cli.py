@@ -2,6 +2,7 @@
 
 from click.testing import CliRunner
 
+from qv import __version__
 from qv.cli.main import cli
 
 
@@ -9,7 +10,7 @@ def test_cli_version():
     runner = CliRunner()
     result = runner.invoke(cli, ["version"])
     assert result.exit_code == 0
-    assert "qv v0.1.0" in result.output
+    assert f"qv v{__version__}" in result.output
 
 
 def test_cli_explain_valid_rule():

@@ -28,11 +28,54 @@ PEP594_REMOVED_MODULES = {
     "audioop",
 }
 
+ALL_PYTHON_3_STDLIB = {
+    "tomllib",  # Added in Python 3.11
+    "zoneinfo",  # Added in Python 3.9
+    "wsgiref",
+    "concurrent",
+    "ctypes",
+    "curses",
+    "email",
+    "html",
+    "mimetypes",
+    "tarfile",
+    "zipfile",
+    "gzip",
+    "bz2",
+    "lzma",
+    "venv",
+    "ensurepip",
+    "trace",
+    "tracemalloc",
+    "secrets",
+    "token",
+    "tokenize",
+    "profile",
+    "cProfile",
+    "pstats",
+    "timeit",
+    "gc",
+    "signal",
+    "errno",
+    "selectors",
+    "sched",
+    "queue",
+    "site",
+    "stat",
+    "reprlib",
+    "copy",
+    "copyreg",
+    "fnmatch",
+    "linecache",
+    "posixpath",
+    "ntpath",
+    "genericpath",
+}
+
 # Known Python standard library modules (Python 3.10+)
 STDLIB_MODULES = (
-    set(sys.stdlib_module_names)
-    if hasattr(sys, "stdlib_module_names")
-    else {
+    (set(sys.stdlib_module_names) if hasattr(sys, "stdlib_module_names") else set())
+    | {
         "abc",
         "argparse",
         "ast",
@@ -86,7 +129,9 @@ STDLIB_MODULES = (
         "zipfile",
         "__future__",
     }
-) | PEP594_REMOVED_MODULES
+    | ALL_PYTHON_3_STDLIB
+    | PEP594_REMOVED_MODULES
+)
 
 # Known tools/packages that may not be imported directly in application code
 IGNORED_UNUSED = {

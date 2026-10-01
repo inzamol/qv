@@ -32,7 +32,7 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-push]
+        stages: [pre-commit, pre-push]
 
       - id: pyright-check
         name: pyright typecheck
@@ -40,4 +40,4 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-push]
+        stages: [pre-commit, pre-push]
