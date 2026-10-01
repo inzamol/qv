@@ -196,14 +196,16 @@ qv architecture [PATH]
 ```
 
 ### 8.4 `qv framework` (alias: `qv frameworks`)
-Runs framework-specific diagnostic rules (e.g. FastAPI blocking calls, insecure CORS, missing response models/timeouts).
+Runs framework-specific diagnostic rules (e.g. FastAPI async blocking calls, SQLAlchemy N+1 queries, unclosed sessions, SQL injection, pool leaks).
 
 ```bash
 qv framework [PATH] [OPTIONS]
 ```
 
 Options:
-- `-n, --name [fastapi|all]`: Filter analysis to a specific framework (default: `all`).
+- `-n, --name [fastapi|sqlalchemy|sql|all]`: Filter analysis to a specific framework (default: all detected frameworks).
+- `--json`: Output framework scan results as structured JSON.
+- `--sarif`: Output framework scan results in SARIF v2.1.0 format.
 
 Example:
 ```bash
@@ -212,5 +214,8 @@ qv framework
 
 # Scan specifically for FastAPI issues
 qv framework --name fastapi
+
+# Scan specifically for SQLAlchemy / SQL database issues
+qv framework --name sqlalchemy
 ```
 

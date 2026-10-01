@@ -159,8 +159,10 @@ Run `qv inspect` (or `qv ui`) for a full terminal dashboard:
 | | `IMP-002` | Unresolved relative or internal module imports | `ERROR` |
 | **Packaging** | `PKG-001` | Missing PEP 621 metadata (name, version, etc.) | `WARNING` |
 | | `PKG-002` | Invalid syntax or malformed keys in `pyproject.toml` | `ERROR` |
+| **FastAPI Doctor** | `FAP-001`–`FAP-038` | Async blocking calls, CPU starvation in endpoints, insecure CORS, missing timeouts, lifecycle anti-patterns, Pydantic v2 migrations | `ERROR` / `WARNING` |
+| **SQL & Database** | `SQL-001`–`SQL-030` | N+1 queries in loops, session leaks, SQL injection, sync DB in async loop, missing eager loading, pool starvation, 2.0 syntax | `ERROR` / `WARNING` |
 
-👉 *See full explanations and remediation steps in the [Rules Catalog](docs/rules.md).*
+👉 *See all 80+ rules and remediation steps in the [Rules Catalog](docs/rules.md).*
 
 ---
 
@@ -291,6 +293,11 @@ qv environment
 
 # Check AST & imports only (circular import loops, unresolvable modules)
 qv architecture
+
+# Check framework-specific issues (FastAPI, SQLAlchemy, SQLModel)
+qv framework
+qv framework --name fastapi
+qv framework --name sqlalchemy
 ```
 
 ---
