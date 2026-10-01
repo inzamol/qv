@@ -4,12 +4,12 @@
 
 **Diagnose why your Python project is unhealthy — understand the root cause and get safe, actionable fixes.**
 
-[![PyPI Version](https://img.shields.io/pypi/v/python-qv.svg?color=blue)](https://pypi.org/project/python-qv/)
+[![PyPI Version](https://img.shields.io/badge/pypi-v0.1.0-blue.svg)](https://pypi.org/project/python-qv/)
 [![Python Versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/python-qv/)
 [![CI Status](https://github.com/inzamol/qv/actions/workflows/ci.yml/badge.svg)](https://github.com/inzamol/qv/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-[Installation](#-installation) • [Quick Start](#-quick-start) • [Features](#-what-it-detects) • [CLI Commands](#-cli-commands) • [CI/CD Integration](#-cicd-integration) • [Documentation](docs/getting_started.md)
+[Installation](#-installation) • [Quick Start](#-quick-start) • [Interactive TUI](#-interactive-tui-explorer) • [Features](#-what-it-detects) • [CLI Commands](#-cli-commands) • [CI/CD Integration](#-cicd-integration) • [Documentation](docs/getting_started.md)
 
 </div>
 
@@ -79,7 +79,25 @@ Run `qv scan` inside any Python repository:
 qv scan
 ```
 
-### 2. Understand Any Flagged Issue
+### 2. Launch the Interactive TUI Explorer
+
+Explore findings interactively with keyboard navigation, live details, dependency tree view, and 1-key remediation:
+
+```bash
+qv inspect
+# or
+qv ui
+```
+
+### 3. Generate a Self-Contained HTML Report
+
+Export a standalone, interactive HTML report with score meters, search filters, and dark/light modes:
+
+```bash
+qv scan --html report.html
+```
+
+### 4. Understand Any Flagged Issue
 
 Need more context on why a rule triggered? Run `explain`:
 
@@ -87,13 +105,41 @@ Need more context on why a rule triggered? Run `explain`:
 qv explain DEP-001
 ```
 
-### 3. Add Project Configuration
+### 5. Add Project Configuration
 
 To add default configuration to your `pyproject.toml`:
 
 ```bash
 qv init
 ```
+
+---
+
+## 🖥️ Interactive TUI Explorer
+
+Run `qv inspect` (or `qv ui`) for a full terminal dashboard:
+
+```text
+┌────────────────────────────────────────────── qv Explorer ──────────────────────────────────────────────┐
+│  🔍 qv Explorer  •  Project: all-in-one-demo  •  Health Score: 40/100                                   │
+│  Python: 3.12.7  |  Package Manager: PIP  |  Errors: 3  |  Warnings: 3  |  Checks Passed: 49            │
+├────────────────────────── Findings (1/6) ──────────────────────────┬──────────────── Details: DEP-001 ──┤
+│     Sev   Rule     Title                                           │ [ERROR] DEP-001: Constraint conflict│
+│  👉 ERR   DEP-001  Dependency constraint conflict                  │ celery requires kombu<5.4.0,>=5.3.0│
+│     ERR   DEP-002  Missing dependency: httpx                       │ Location: pyproject.toml           │
+│     ERR   DEP-002  Missing dependency: pydantic                    │                                    │
+│     WARN  DEP-003  Unused declared dependency: requests            │ Remediation:                       │
+│     WARN  DEP-003  Unused declared dependency: pyyaml              │   👉 Pin kombu to <5.4.0,>=5.3.0   │
+│     ... 1 more below ...                                           │      $ pip install 'kombu<5.4.0'   │
+├────────────────────────────────────────────────────────────────────┴────────────────────────────────────┤
+│ [↑/k, ↓/j] Navigate  •  [Enter] Expand  •  [f] Apply Fix  •  [t] Tree View  •  [q] Quit                 │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **`↑ / k` & `↓ / j`**: Scroll smoothly through findings.
+- **`f`**: Apply automated remediation fix for the active finding.
+- **`t`**: Toggle between Findings view and live Dependency Tree.
+- **`Enter`**: Expand details panel.
 
 ---
 
@@ -118,45 +164,155 @@ qv init
 
 ---
 
-## 🛠️ CLI Commands
+## 🛠️ CLI Commands & Examples
+
+### 1. `qv scan` — Full Project Diagnostics
+Run a comprehensive health audit scanning dependencies, runtime environment, imports, and packaging.
 
 ```bash
-# Full project diagnostic scan
+# Scan current repository
 qv scan
 
-# Scan another folder
-qv scan ./services/billing
+# Scan a specific directory or microservice
+qv scan ./services/payment
 
-# Strict mode: fail CI on warnings as well as errors
+# Strict mode: fail CI if any warnings exist (exit code 1)
 qv scan --strict
 
-# Output machine-readable formats
-qv scan --json
+# Generate a self-contained interactive HTML dashboard
+qv scan --html report.html
+
+# Output SARIF format for GitHub Code Scanning / IDE integration
 qv scan --sarif -o results.sarif
 
-# Run focused subsystem scans
-qv dependency       # Check package constraints & imports
-qv environment      # Check Python, Docker & CI version drift
-qv architecture     # Check for circular imports & dead paths
+# Output machine-readable JSON
+qv scan --json -o results.json
 
-# Automatically fix detectable issues
-qv fix              # Interactive fix wizard
-qv fix --dry-run    # Preview fixes and diffs
-qv fix -y           # Apply all safe fixes automatically
+# Offline / Airgapped mode (skips remote package index checks)
+qv scan --offline
 
-# Visualize dependencies & import architecture
-qv tree             # Full visual tree
-qv tree --imports   # View circular imports in module graph
-qv tree -d -L 2     # Direct and transitive dependencies
-
-# Explain a rule
-qv explain DEP-002
-
-# Check installed version
-qv version
+# Emit GitHub Actions workflow command annotations (::error:: and ::warning::)
+qv scan --ci --github-annotations
 ```
 
-👉 *See detailed options in the [CLI Reference](docs/cli_reference.md).*
+---
+
+### 2. `qv inspect` (or `qv ui`) — Interactive Terminal Dashboard
+Explore diagnostic findings, view evidence, inspect circular import trees, and apply fixes interactively with keyboard shortcuts.
+
+```bash
+# Launch interactive dashboard for current repository
+qv inspect
+
+# Inspect another project
+qv inspect ../another-service
+
+# Airgapped / offline TUI
+qv inspect --offline
+```
+
+*Controls: `↑`/`k` and `↓`/`j` to navigate, `Enter` to expand details, `f` to apply fix, `t` to toggle dependency tree, `q` to quit.*
+
+---
+
+### 3. `qv fix` — Safe Automated Remediation
+Automatically generate and apply deterministic fixes to your project manifest and configuration.
+
+```bash
+# Interactive wizard (prompts before applying each fix)
+qv fix
+
+# Preview proposed file diffs and commands without modifying disk
+qv fix --dry-run
+
+# Automatically apply all safe fixes without prompting
+qv fix -y
+
+# Fix only a specific rule (e.g. missing dependencies)
+qv fix --rule DEP-002 -y
+
+# Apply fixes and execute package manager sync commands
+qv fix --sync -y
+```
+
+---
+
+### 4. `qv tree` (or `qv graph`) — Dependency & Architecture Visualizer
+Render color-coded visual trees of package dependencies and source module import graphs.
+
+```bash
+# Render complete overview (dependency tree + import architecture)
+qv tree
+
+# Visualize direct & transitive dependencies up to depth 2
+qv tree --dependencies --depth 2
+# or shorthand:
+qv tree -d -L 2
+
+# Visualize internal module import graph and circular import cycles
+qv tree --imports
+# or shorthand:
+qv tree -i
+
+# Export tree hierarchy and cycle statistics as JSON
+qv tree --json > tree.json
+```
+
+---
+
+### 5. `qv explain` — Rule Catalog & Fix Advice
+Look up detailed explanations, common causes, evidence criteria, and remediation advice for any diagnostic rule.
+
+```bash
+# Explain dependency constraint conflicts
+qv explain DEP-001
+
+# Explain missing undeclared imports
+qv explain DEP-002
+
+# Explain circular import loops
+qv explain IMP-001
+
+# Explain Python/Docker environment drift
+qv explain ENV-002
+```
+
+---
+
+### 6. Subsystem-Focused Scans
+Run focused audits on specific components when troubleshooting or in modular CI pipelines:
+
+```bash
+# Check dependencies only (conflicts, missing, unused, incompatible Python)
+qv dependency
+
+# Check environment drift only (interpreter version, Dockerfile, CI matrix)
+qv environment
+
+# Check AST & imports only (circular import loops, unresolvable modules)
+qv architecture
+```
+
+---
+
+### 7. `qv init` — Project Configuration Setup
+Initialize or update `pyproject.toml` with default `[tool.qv]` configuration rules and path exclusions without overwriting existing settings.
+
+```bash
+# Initialize [tool.qv] in pyproject.toml
+qv init
+```
+
+---
+
+### 8. `qv version` — Version Information
+```bash
+qv version
+# or
+qv --version
+```
+
+👉 *See full option matrices in the [CLI Reference](docs/cli_reference.md).*
 
 ---
 
@@ -197,9 +353,30 @@ python = "3.12"
 
 ## 🤖 CI/CD Integration
 
-### GitHub Actions (with SARIF code scanning)
+### Official GitHub Action
 
-Add this step to your GitHub Actions workflow (`.github/workflows/ci.yml`):
+You can use the official `qv` GitHub Action directly in `.github/workflows/ci.yml`:
+
+```yaml
+name: Health & Dependency Scan
+
+on: [push, pull_request]
+
+jobs:
+  qv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run qv Health Scan
+        uses: inzamol/qv@v1
+        with:
+          strict: true
+          html_report: report.html
+          sarif_report: qv.sarif
+          github_annotations: true
+```
+
+### GitHub Actions (Manual setup with SARIF code scanning)
 
 ```yaml
 name: Health & Dependency Scan
@@ -213,11 +390,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
 
-      # Run scan in CI mode
+      # Run scan with PR annotations
       - name: Run qv
-        run: uv run qv scan --ci
+        run: uv run qv scan --ci --github-annotations
 
-      # Optional: Generate SARIF report for GitHub Code Scanning
+      # Generate SARIF report for GitHub Code Scanning
       - name: Generate SARIF report
         run: uv run qv scan --sarif -o qv.sarif
         if: always()
@@ -231,7 +408,7 @@ jobs:
 
 ### Pre-commit Hook Integration
 
-Add `qv` directly to your `.pre-commit-config.yaml` to prevent committing unhealthy dependencies:
+Add `qv` directly to your `.pre-commit-config.yaml` to catch dependency drift and circular imports before committing:
 
 ```yaml
 repos:
