@@ -1,7 +1,6 @@
 """Unit and integration tests for CLI commands."""
 
 from click.testing import CliRunner
-
 from qv.cli.main import cli
 
 

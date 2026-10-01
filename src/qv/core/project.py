@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 
 from packaging.requirements import Requirement
-
 from qv.core.config import QvConfig
 from qv.core.context import (
     CIConfig,
@@ -91,11 +90,10 @@ class ProjectDiscovery:
                     except Exception:
                         pass
 
-                # Optional/dev dependencies
-                for group, deps in (
+                # Optional/extra/dev dependencies (PEP 621)
+                for _group, deps in (
                     pyproject_data.get("project", {}).get("optional-dependencies", {}).items()
                 ):
-                    is_dev = group in ("dev", "test", "lint")
                     for dep_str in deps:
                         try:
                             req = Requirement(dep_str)
@@ -104,14 +102,53 @@ class ProjectDiscovery:
                                     name=req.name,
                                     specifier=str(req.specifier),
                                     source_file=pyproject_path,
-                                    is_dev=is_dev,
+                                    is_dev=True,
                                     extras=tuple(req.extras),
                                 )
                             )
                         except Exception:
                             pass
 
-                # Poetry style [tool.poetry.dependencies]
+                # PEP 735 Dependency Groups (e.g. [dependency-groups] dev = [...], test = [...])
+                for _group, deps in pyproject_data.get("dependency-groups", {}).items():
+                    if isinstance(deps, list):
+                        for dep_item in deps:
+                            if isinstance(dep_item, str):
+                                try:
+                                    req = Requirement(dep_item)
+                                    dependencies.append(
+                                        DependencyDeclaration(
+                                            name=req.name,
+                                            specifier=str(req.specifier),
+                                            source_file=pyproject_path,
+                                            is_dev=True,
+                                            extras=tuple(req.extras),
+                                        )
+                                    )
+                                except Exception:
+                                    pass
+
+                # uv dev dependencies: [tool.uv.dev-dependencies] or [tool.uv] dev-dependencies = [...]
+                uv_dev_deps = (
+                    pyproject_data.get("tool", {}).get("uv", {}).get("dev-dependencies", [])
+                )
+                if isinstance(uv_dev_deps, list):
+                    for dep_str in uv_dev_deps:
+                        try:
+                            req = Requirement(dep_str)
+                            dependencies.append(
+                                DependencyDeclaration(
+                                    name=req.name,
+                                    specifier=str(req.specifier),
+                                    source_file=pyproject_path,
+                                    is_dev=True,
+                                    extras=tuple(req.extras),
+                                )
+                            )
+                        except Exception:
+                            pass
+
+                # Poetry style [tool.poetry.dependencies] (production)
                 poetry_deps = (
                     pyproject_data.get("tool", {}).get("poetry", {}).get("dependencies", {})
                 )
@@ -124,8 +161,63 @@ class ProjectDiscovery:
                             name=dep_name,
                             specifier=spec,
                             source_file=pyproject_path,
+                            is_dev=False,
                         )
                     )
+
+                # Poetry dev dependencies: [tool.poetry.dev-dependencies] & [tool.poetry.group.<name>.dependencies]
+                poetry_dev_deps = (
+                    pyproject_data.get("tool", {}).get("poetry", {}).get("dev-dependencies", {})
+                )
+                for dep_name, dep_val in poetry_dev_deps.items():
+                    spec = dep_val if isinstance(dep_val, str) else str(dep_val.get("version", ""))
+                    dependencies.append(
+                        DependencyDeclaration(
+                            name=dep_name,
+                            specifier=spec,
+                            source_file=pyproject_path,
+                            is_dev=True,
+                        )
+                    )
+
+                poetry_groups = pyproject_data.get("tool", {}).get("poetry", {}).get("group", {})
+                for _grp_name, grp_data in poetry_groups.items():
+                    if isinstance(grp_data, dict):
+                        for dep_name, dep_val in grp_data.get("dependencies", {}).items():
+                            spec = (
+                                dep_val
+                                if isinstance(dep_val, str)
+                                else str(dep_val.get("version", ""))
+                            )
+                            dependencies.append(
+                                DependencyDeclaration(
+                                    name=dep_name,
+                                    specifier=spec,
+                                    source_file=pyproject_path,
+                                    is_dev=True,
+                                )
+                            )
+
+                # PDM dev dependencies: [tool.pdm.dev-dependencies]
+                pdm_dev_deps = (
+                    pyproject_data.get("tool", {}).get("pdm", {}).get("dev-dependencies", {})
+                )
+                for _grp_name, grp_list in pdm_dev_deps.items():
+                    if isinstance(grp_list, list):
+                        for dep_str in grp_list:
+                            try:
+                                req = Requirement(dep_str)
+                                dependencies.append(
+                                    DependencyDeclaration(
+                                        name=req.name,
+                                        specifier=str(req.specifier),
+                                        source_file=pyproject_path,
+                                        is_dev=True,
+                                        extras=tuple(req.extras),
+                                    )
+                                )
+                            except Exception:
+                                pass
             except Exception:
                 pass
 
@@ -210,8 +302,10 @@ class ProjectDiscovery:
             try:
                 content = py_path.read_text(encoding="utf-8")
                 is_init = py_path.name == "__init__.py"
-                # Compute logical module name
+                # Compute logical module name (strip 'src' prefix if using standard src layout)
                 mod_parts = list(rel_path.with_suffix("").parts)
+                if mod_parts and mod_parts[0] == "src" and len(mod_parts) > 1:
+                    mod_parts = mod_parts[1:]
                 if is_init:
                     mod_parts = mod_parts[:-1]
                 module_name = ".".join(mod_parts)

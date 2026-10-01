@@ -3,7 +3,6 @@
 from pathlib import Path
 
 from click.testing import CliRunner
-
 from qv.cli.main import cli
 from qv.core.config import QvConfig
 from qv.core.project import ProjectDiscovery

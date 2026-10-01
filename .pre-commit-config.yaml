@@ -6,8 +6,12 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/inzamol/qv
-    rev: v0.1.0
+  - repo: local
     hooks:
       - id: qv-scan
+        name: qv health scan
+        entry: uv run qv scan
+        language: system
         args: [--strict, --offline]
+        pass_filenames: false
+        always_run: true

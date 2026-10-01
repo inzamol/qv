@@ -243,9 +243,22 @@ class ImportAnalyzer:
         for imp in context.imports:
             if imp.module_name:
                 imported_module_names.add(imp.module_name)
+                clean_name = (
+                    imp.module_name[4:] if imp.module_name.startswith("src.") else imp.module_name
+                )
+                imported_module_names.add(clean_name)
                 parts = imp.module_name.split(".")
                 for i in range(1, len(parts) + 1):
-                    imported_module_names.add(".".join(parts[:i]))
+                    sub = ".".join(parts[:i])
+                    imported_module_names.add(sub)
+                    if sub.startswith("src."):
+                        imported_module_names.add(sub[4:])
+            if imp.imported_symbols:
+                for sym in imp.imported_symbols:
+                    if imp.module_name:
+                        imported_module_names.add(f"{imp.module_name}.{sym}")
+                        if imp.module_name.startswith("src."):
+                            imported_module_names.add(f"{imp.module_name[4:]}.{sym}")
 
         entrypoint_names = {
             "__init__",
@@ -270,7 +283,14 @@ class ImportAnalyzer:
             if sf.is_init or stem in entrypoint_names or "__main__" in sf.content:
                 continue
 
-            if sf.module_name not in imported_module_names and stem not in imported_module_names:
+            clean_sf_mod = (
+                sf.module_name[4:] if sf.module_name.startswith("src.") else sf.module_name
+            )
+            if (
+                sf.module_name not in imported_module_names
+                and clean_sf_mod not in imported_module_names
+                and stem not in imported_module_names
+            ):
                 diagnostics.append(
                     Diagnostic(
                         id=rule.id,
