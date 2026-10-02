@@ -1,0 +1,23 @@
+# Documentation & static assets
+docs/
+site/
+dev_docs/
+mkdocs.yml
+.readthedocs.yaml
+
+# Lockfiles and environment configs
+uv.lock
+tox.ini
+.tox/
+.coverage
+.ruff_cache/
+.pytest_cache/
+
+# Examples
+examples/
+
+# GitHub and CI/CD configs
+.github/
+action.yml
+.pre-commit-config.yaml
+.pre-commit-hooks.yaml

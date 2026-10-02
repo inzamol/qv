@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import configparser
 import importlib.metadata
 import re
 import sys
@@ -129,6 +130,22 @@ class ProjectDiscovery:
                                 except Exception:
                                     pass
 
+                # Build system requires: [build-system] requires = [...]
+                for dep_str in pyproject_data.get("build-system", {}).get("requires", []):
+                    try:
+                        req = Requirement(dep_str)
+                        dependencies.append(
+                            DependencyDeclaration(
+                                name=req.name,
+                                specifier=str(req.specifier),
+                                source_file=pyproject_path,
+                                is_dev=True,
+                                extras=tuple(req.extras),
+                            )
+                        )
+                    except Exception:
+                        pass
+
                 # uv dev dependencies: [tool.uv.dev-dependencies] or [tool.uv] dev-dependencies = [...]
                 uv_dev_deps = (
                     pyproject_data.get("tool", {}).get("uv", {}).get("dev-dependencies", [])
@@ -222,23 +239,222 @@ class ProjectDiscovery:
             except Exception:
                 pass
 
-        # Check requirements files
-        req_candidates = [
-            self.root / "requirements.txt",
-            self.root / "requirements-dev.txt",
-            self.root / "requirements" / "base.txt",
-            self.root / "requirements" / "dev.txt",
-            self.root / "requirements" / "prod.txt",
-        ]
-        for req_path in req_candidates:
-            if req_path.exists():
-                manifest_files.append(req_path)
-                is_dev = "dev" in req_path.name.lower()
+        # Check setup.cfg
+        setup_cfg_path = self.root / "setup.cfg"
+        if setup_cfg_path.exists() and setup_cfg_path.is_file():
+            manifest_files.append(setup_cfg_path)
+            try:
+                cfg = configparser.ConfigParser()
+                cfg.read(setup_cfg_path, encoding="utf-8")
+                if "options" in cfg and "install_requires" in cfg["options"]:
+                    for req_str in cfg["options"]["install_requires"].strip().splitlines():
+                        req_str = re.sub(r"\s+#.*$", "", req_str).strip()
+                        if req_str:
+                            try:
+                                req = Requirement(req_str)
+                                dependencies.append(
+                                    DependencyDeclaration(
+                                        name=req.name,
+                                        specifier=str(req.specifier),
+                                        source_file=setup_cfg_path,
+                                        is_dev=False,
+                                        extras=tuple(req.extras),
+                                    )
+                                )
+                            except Exception:
+                                pass
+                if "options.extras_require" in cfg:
+                    for _grp, req_lines in cfg["options.extras_require"].items():
+                        for req_str in req_lines.strip().splitlines():
+                            req_str = re.sub(r"\s+#.*$", "", req_str).strip()
+                            if req_str:
+                                try:
+                                    req = Requirement(req_str)
+                                    dependencies.append(
+                                        DependencyDeclaration(
+                                            name=req.name,
+                                            specifier=str(req.specifier),
+                                            source_file=setup_cfg_path,
+                                            is_dev=True,
+                                            extras=tuple(req.extras),
+                                        )
+                                    )
+                                except Exception:
+                                    pass
+            except Exception:
+                pass
+
+        # Check setup.py
+        setup_py_path = self.root / "setup.py"
+        if setup_py_path.exists() and setup_py_path.is_file():
+            if setup_py_path not in manifest_files:
+                manifest_files.append(setup_py_path)
+            try:
+                setup_content = setup_py_path.read_text(encoding="utf-8")
+                try:
+                    tree = ast.parse(setup_content, filename=str(setup_py_path))
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Call):
+                            for kw in node.keywords:
+                                if kw.arg == "install_requires" and isinstance(
+                                    kw.value, (ast.List, ast.Tuple, ast.Set)
+                                ):
+                                    for elt in kw.value.elts:
+                                        if isinstance(elt, ast.Constant) and isinstance(
+                                            elt.value, str
+                                        ):
+                                            try:
+                                                req = Requirement(elt.value)
+                                                dependencies.append(
+                                                    DependencyDeclaration(
+                                                        name=req.name,
+                                                        specifier=str(req.specifier),
+                                                        source_file=setup_py_path,
+                                                        line_number=getattr(elt, "lineno", None),
+                                                        is_dev=False,
+                                                        extras=tuple(req.extras),
+                                                    )
+                                                )
+                                            except Exception:
+                                                pass
+                                elif kw.arg == "extras_require" and isinstance(kw.value, ast.Dict):
+                                    for _k, v in zip(kw.value.keys, kw.value.values, strict=False):
+                                        if isinstance(v, (ast.List, ast.Tuple, ast.Set)):
+                                            for elt in v.elts:
+                                                if isinstance(elt, ast.Constant) and isinstance(
+                                                    elt.value, str
+                                                ):
+                                                    try:
+                                                        req = Requirement(elt.value)
+                                                        dependencies.append(
+                                                            DependencyDeclaration(
+                                                                name=req.name,
+                                                                specifier=str(req.specifier),
+                                                                source_file=setup_py_path,
+                                                                line_number=getattr(
+                                                                    elt, "lineno", None
+                                                                ),
+                                                                is_dev=True,
+                                                                extras=tuple(req.extras),
+                                                            )
+                                                        )
+                                                    except Exception:
+                                                        pass
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        # Check Pipfile
+        pipfile_path = self.root / "Pipfile"
+        if pipfile_path.exists() and pipfile_path.is_file():
+            if pipfile_path not in manifest_files:
+                manifest_files.append(pipfile_path)
+            try:
+                with open(pipfile_path, "rb") as f:
+                    pipfile_data = tomllib.load(f)
+                for dep_name, spec in pipfile_data.get("packages", {}).items():
+                    spec_str = (
+                        spec
+                        if isinstance(spec, str)
+                        else str(spec.get("version", ""))
+                        if isinstance(spec, dict)
+                        else ""
+                    )
+                    dependencies.append(
+                        DependencyDeclaration(
+                            name=dep_name,
+                            specifier="" if spec_str == "*" else spec_str,
+                            source_file=pipfile_path,
+                            is_dev=False,
+                        )
+                    )
+                for dep_name, spec in pipfile_data.get("dev-packages", {}).items():
+                    spec_str = (
+                        spec
+                        if isinstance(spec, str)
+                        else str(spec.get("version", ""))
+                        if isinstance(spec, dict)
+                        else ""
+                    )
+                    dependencies.append(
+                        DependencyDeclaration(
+                            name=dep_name,
+                            specifier="" if spec_str == "*" else spec_str,
+                            source_file=pipfile_path,
+                            is_dev=True,
+                        )
+                    )
+            except Exception:
+                pass
+
+        # Check requirements files & directories
+        discovered_req_files: set[Path] = set()
+
+        for pat in (
+            "*requirement*.txt",
+            "*requirement*.in",
+            "requirements*.txt",
+            "requirements*.in",
+            "reqs*.txt",
+            "*-requirements.txt",
+            "dev-requirements.txt",
+            "test-requirements.txt",
+            "constraints.txt",
+        ):
+            for p in self.root.glob(pat):
+                discovered_req_files.add(p)
+
+        for req_dir_name in ("requirements", "reqs", "deps", "requirements.d"):
+            req_dir = self.root / req_dir_name
+            if req_dir.is_dir():
+                for ext in ("*.txt", "*.in", "*.pip"):
+                    for p in req_dir.rglob(ext):
+                        discovered_req_files.add(p)
+
+        for req_path in sorted(discovered_req_files):
+            if req_path.is_file():
+                if req_path not in manifest_files:
+                    manifest_files.append(req_path)
+                p_str = str(req_path).lower()
+                is_dev = any(
+                    k in p_str
+                    for k in (
+                        "dev",
+                        "test",
+                        "doc",
+                        "lint",
+                        "type",
+                        "ci",
+                        "bench",
+                        "local",
+                        "stage",
+                    )
+                )
                 try:
                     with open(req_path, encoding="utf-8") as f:
-                        for line_idx, line in enumerate(f, 1):
-                            line = line.strip()
-                            if not line or line.startswith("#") or line.startswith("-"):
+                        for line_idx, raw_line in enumerate(f, 1):
+                            line = re.sub(r"\s+#.*$", "", raw_line).strip()
+                            if not line or line.startswith("#"):
+                                continue
+                            if line.startswith("-"):
+                                if line.startswith("-e ") or line.startswith("--editable "):
+                                    egg_match = re.search(r"#egg=([\w\-_]+)", line)
+                                    if egg_match:
+                                        try:
+                                            req = Requirement(egg_match.group(1))
+                                            dependencies.append(
+                                                DependencyDeclaration(
+                                                    name=req.name,
+                                                    specifier=str(req.specifier),
+                                                    source_file=req_path,
+                                                    line_number=line_idx,
+                                                    is_dev=is_dev,
+                                                    extras=tuple(req.extras),
+                                                )
+                                            )
+                                        except Exception:
+                                            pass
                                 continue
                             try:
                                 req = Requirement(line)
@@ -273,8 +489,27 @@ class ProjectDiscovery:
 
         # 3. Installed packages collection
         installed_packages: dict[str, InstalledDistribution] = {}
+        project_site_packages: list[str] = []
+        for venv_name in (".venv", "venv", "env", ".env"):
+            venv_dir = self.root / venv_name
+            if venv_dir.is_dir():
+                win_sp = venv_dir / "Lib" / "site-packages"
+                if win_sp.is_dir():
+                    project_site_packages.append(str(win_sp))
+                lib_dir = venv_dir / "lib"
+                if lib_dir.is_dir():
+                    for py_dir in lib_dir.glob("python*"):
+                        sp = py_dir / "site-packages"
+                        if sp.is_dir():
+                            project_site_packages.append(str(sp))
+
         try:
-            for dist in importlib.metadata.distributions():
+            dists = (
+                importlib.metadata.distributions(path=project_site_packages)
+                if project_site_packages
+                else importlib.metadata.distributions()
+            )
+            for dist in dists:
                 name = dist.metadata["Name"]
                 if not name:
                     continue
@@ -320,6 +555,9 @@ class ProjectDiscovery:
                 )
                 source_files.append(source_file)
 
+                # Base package name for relative import resolution
+                file_pkg_parts = mod_parts if is_init else mod_parts[:-1]
+
                 # Parse AST
                 try:
                     tree = ast.parse(content, filename=str(py_path))
@@ -332,12 +570,33 @@ class ProjectDiscovery:
                                         source_file=py_path,
                                         line_number=node.lineno,
                                         is_relative=False,
+                                        level=0,
+                                        resolved_module=alias.name,
                                     )
                                 )
                         elif isinstance(node, ast.ImportFrom):
                             mod = node.module or ""
-                            is_rel = node.level > 0
+                            level = node.level or 0
+                            is_rel = level > 0
                             symbols = tuple(alias.name for alias in node.names)
+
+                            resolved_mod: str | None = mod
+                            if is_rel:
+                                if level == 1:
+                                    base_pkg = ".".join(file_pkg_parts)
+                                else:
+                                    cutoff = len(file_pkg_parts) - (level - 1)
+                                    base_pkg = (
+                                        ".".join(file_pkg_parts[:cutoff])
+                                        if cutoff >= 0 and file_pkg_parts
+                                        else ""
+                                    )
+
+                                if mod:
+                                    resolved_mod = f"{base_pkg}.{mod}" if base_pkg else mod
+                                else:
+                                    resolved_mod = base_pkg if base_pkg else None
+
                             imports.append(
                                 ImportRecord(
                                     module_name=mod,
@@ -345,6 +604,8 @@ class ProjectDiscovery:
                                     line_number=node.lineno,
                                     is_relative=is_rel,
                                     imported_symbols=symbols,
+                                    level=level,
+                                    resolved_module=resolved_mod,
                                 )
                             )
                 except SyntaxError:

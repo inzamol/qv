@@ -118,10 +118,21 @@ class ImportAnalyzer:
             if not src_mod:
                 continue
 
-            target_mod = imp.module_name
-            # If target module is in project
-            if target_mod in module_to_file and target_mod != src_mod:
-                graph[src_mod].add(target_mod)
+            target_candidates: list[str] = []
+            if imp.is_relative:
+                if imp.resolved_module:
+                    target_candidates.append(imp.resolved_module)
+                    for sym in imp.imported_symbols:
+                        target_candidates.append(f"{imp.resolved_module}.{sym}")
+            else:
+                target_candidates.append(imp.module_name)
+                for sym in imp.imported_symbols:
+                    if imp.module_name:
+                        target_candidates.append(f"{imp.module_name}.{sym}")
+
+            for target_mod in target_candidates:
+                if target_mod in module_to_file and target_mod != src_mod:
+                    graph[src_mod].add(target_mod)
 
         # Detect cycles using DFS
         visited: set[str] = set()
@@ -192,27 +203,79 @@ class ImportAnalyzer:
             return diagnostics
 
         known_modules = {sf.module_name for sf in context.source_files}
+        known_packages: set[str] = set()
+        for mod in known_modules:
+            parts = mod.split(".")
+            for i in range(1, len(parts)):
+                known_packages.add(".".join(parts[:i]))
 
         for imp in context.imports:
-            if not imp.module_name:
-                continue
+            rel_path = (
+                imp.source_file.relative_to(context.project_root)
+                if imp.source_file.is_relative_to(context.project_root)
+                else imp.source_file
+            )
 
-            # If it's a relative import or clearly aiming at a known root
             if imp.is_relative:
-                rel_path = (
-                    imp.source_file.relative_to(context.project_root)
-                    if imp.source_file.is_relative_to(context.project_root)
-                    else imp.source_file
-                )
-                # If relative and target module is empty or not in known modules
-                if imp.module_name and imp.module_name not in known_modules:
+                target = imp.resolved_module
+                if not target:
                     diagnostics.append(
                         Diagnostic(
                             id=rule.id,
                             severity=rule.default_severity,
                             category=rule.category,
-                            title=f"Unresolved relative import: {imp.module_name}",
-                            message=f"Module '{imp.module_name}' imported at {rel_path}:{imp.line_number} could not be resolved.",
+                            title=f"Unresolved relative import: {imp.module_name or '.'}",
+                            message=f"Relative import at {rel_path}:{imp.line_number} attempts to import beyond top-level package.",
+                            evidence=[
+                                Evidence(
+                                    fact=f"Relative import statement at {rel_path}:{imp.line_number}",
+                                    source=str(rel_path),
+                                )
+                            ],
+                            suggestions=[
+                                Suggestion(
+                                    description=f"Correct relative import path in {rel_path}.",
+                                )
+                            ],
+                            file=str(rel_path),
+                            line=imp.line_number,
+                            doc_url=rule.doc_url,
+                        )
+                    )
+                    continue
+
+                target_exists = (
+                    target in known_modules
+                    or target in known_packages
+                    or any(m.startswith(f"{target}.") for m in known_modules)
+                )
+
+                if not target_exists and not imp.module_name:
+                    # from . import foo, bar
+                    for sym in imp.imported_symbols:
+                        sym_target = f"{target}.{sym}"
+                        if sym_target in known_modules or sym_target in known_packages:
+                            target_exists = True
+                            break
+
+                if not target_exists:
+                    # Check filesystem sibling or child
+                    source_dir = imp.source_file.parent
+                    if imp.module_name:
+                        mod_rel_parts = imp.module_name.split(".")
+                        sibling_py = source_dir.joinpath(*mod_rel_parts).with_suffix(".py")
+                        sibling_dir = source_dir.joinpath(*mod_rel_parts)
+                        if sibling_py.exists() or sibling_dir.exists():
+                            target_exists = True
+
+                if not target_exists:
+                    diagnostics.append(
+                        Diagnostic(
+                            id=rule.id,
+                            severity=rule.default_severity,
+                            category=rule.category,
+                            title=f"Unresolved relative import: {imp.module_name or target}",
+                            message=f"Module '{imp.module_name or target}' imported at {rel_path}:{imp.line_number} could not be resolved.",
                             evidence=[
                                 Evidence(
                                     fact=f"Relative import statement at {rel_path}:{imp.line_number}",
@@ -241,24 +304,26 @@ class ImportAnalyzer:
 
         imported_module_names: set[str] = set()
         for imp in context.imports:
-            if imp.module_name:
-                imported_module_names.add(imp.module_name)
-                clean_name = (
-                    imp.module_name[4:] if imp.module_name.startswith("src.") else imp.module_name
-                )
-                imported_module_names.add(clean_name)
-                parts = imp.module_name.split(".")
+            candidates: list[str] = []
+            if imp.is_relative and imp.resolved_module:
+                candidates.append(imp.resolved_module)
+                for sym in imp.imported_symbols:
+                    candidates.append(f"{imp.resolved_module}.{sym}")
+            elif imp.module_name:
+                candidates.append(imp.module_name)
+                for sym in imp.imported_symbols:
+                    candidates.append(f"{imp.module_name}.{sym}")
+
+            for c in candidates:
+                imported_module_names.add(c)
+                if c.startswith("src."):
+                    imported_module_names.add(c[4:])
+                parts = c.split(".")
                 for i in range(1, len(parts) + 1):
                     sub = ".".join(parts[:i])
                     imported_module_names.add(sub)
                     if sub.startswith("src."):
                         imported_module_names.add(sub[4:])
-            if imp.imported_symbols:
-                for sym in imp.imported_symbols:
-                    if imp.module_name:
-                        imported_module_names.add(f"{imp.module_name}.{sym}")
-                        if imp.module_name.startswith("src."):
-                            imported_module_names.add(f"{imp.module_name[4:]}.{sym}")
 
         entrypoint_names = {
             "__init__",
@@ -271,11 +336,41 @@ class ImportAnalyzer:
             "asgi",
             "server",
             "setup",
+            "conf",
+            "tasks",
+            "fabfile",
+            "celeryconfig",
+            "manage",
+            "settings",
+            "plugin",
+            "plugins",
+            "env",
+            "load",
+        }
+
+        entrypoint_dirs = {
+            "docs",
+            "doc",
+            "examples",
+            "example",
+            "sample",
+            "samples",
+            "benchmarks",
+            "benchmark",
+            "migrations",
+            "alembic",
+            "scripts",
+            "bin",
+            "tools",
         }
 
         for sf in context.source_files:
             rel_str = str(sf.relative_path).replace("\\", "/")
             stem = sf.path.stem
+            parts = [p.lower() for p in sf.relative_path.parts]
+
+            if any(d in parts for d in entrypoint_dirs):
+                continue
 
             if "test" in rel_str.lower() or stem.startswith("test_") or stem.endswith("_test"):
                 continue

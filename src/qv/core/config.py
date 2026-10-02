@@ -54,6 +54,9 @@ class QvConfig:
     target_python: str | None = None
     strict: bool = False
     offline: bool = False
+    hide_warnings: bool = False
+    errors_only: bool = False
+    min_severity: Severity | None = None
 
     def is_rule_enabled(self, rule_id: str) -> bool:
         if rule_id in self.ignored_rules:
@@ -111,6 +114,20 @@ class QvConfig:
         runtime_dict = tool_config.get("runtime", {})
         target_python = runtime_dict.get("python") or data.get("project", {}).get("requires-python")
         offline = bool(tool_config.get("offline", False))
+        hide_warnings = bool(
+            tool_config.get("hide_warnings", tool_config.get("hide-warnings", False))
+        )
+        errors_only = bool(tool_config.get("errors_only", tool_config.get("errors-only", False)))
+        min_sev_str = (
+            tool_config.get("min_severity")
+            or tool_config.get("min-severity")
+            or tool_config.get("severity")
+        )
+        min_severity = (
+            Severity(str(min_sev_str).lower())
+            if min_sev_str and str(min_sev_str).lower() in ("error", "warning", "info")
+            else None
+        )
 
         return cls(
             rules=rules,
@@ -118,6 +135,9 @@ class QvConfig:
             paths=paths,
             target_python=target_python,
             offline=offline,
+            hide_warnings=hide_warnings,
+            errors_only=errors_only,
+            min_severity=min_severity,
         )
 
 

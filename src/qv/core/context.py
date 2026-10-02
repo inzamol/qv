@@ -53,6 +53,8 @@ class ImportRecord:
     line_number: int
     is_relative: bool
     imported_symbols: tuple[str, ...] = ()
+    level: int = 0
+    resolved_module: str | None = None
 
 
 @dataclass(frozen=True)

@@ -105,6 +105,11 @@ class TreeVisualizer:
             str(sf.path): sf.module_name for sf in self.context.source_files
         }
         known_modules: set[str] = {sf.module_name for sf in self.context.source_files}
+        known_packages: set[str] = set()
+        for mod in known_modules:
+            parts = mod.split(".")
+            for i in range(1, len(parts)):
+                known_packages.add(".".join(parts[:i]))
 
         # Map each module to its imported modules
         module_imports: dict[str, list[tuple[str, bool, bool]]] = {}
@@ -116,9 +121,27 @@ class TreeVisualizer:
             if not src_mod:
                 continue
 
-            target = imp.module_name
-            is_internal = target in known_modules
-            is_unresolved = imp.is_relative and target not in known_modules
+            target = (
+                imp.resolved_module
+                if (imp.is_relative and imp.resolved_module)
+                else imp.module_name
+            )
+            if not target:
+                continue
+
+            is_internal = (
+                target in known_modules
+                or target in known_packages
+                or any(m.startswith(f"{target}.") for m in known_modules)
+            )
+            if not is_internal and not imp.module_name and imp.is_relative:
+                for sym in imp.imported_symbols:
+                    if f"{target}.{sym}" in known_modules or f"{target}.{sym}" in known_packages:
+                        is_internal = True
+                        target = f"{target}.{sym}"
+                        break
+
+            is_unresolved = imp.is_relative and not is_internal
             module_imports[src_mod].append((target, is_internal, is_unresolved))
 
         # Root modules (modules not imported by other modules, or entrypoints)

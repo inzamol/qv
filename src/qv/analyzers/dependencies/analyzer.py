@@ -9,7 +9,7 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 from qv.core.context import ProjectContext
-from qv.core.models import Diagnostic, Evidence, Suggestion
+from qv.core.models import Diagnostic, Evidence, Severity, Suggestion
 from qv.rules.registry import get_rule_definition
 
 PEP594_REMOVED_MODULES = {
@@ -149,6 +149,49 @@ IGNORED_UNUSED = {
     "wheel",
     "gunicorn",
     "uvicorn",
+    "build",
+}
+
+KNOWN_IMPORT_TO_PKG: dict[str, str] = {
+    "yaml": "pyyaml",
+    "cv2": "opencv-python",
+    "pil": "pillow",
+    "dateutil": "python-dateutil",
+    "bs4": "beautifulsoup4",
+    "sklearn": "scikit-learn",
+    "attr": "attrs",
+    "attrs": "attrs",
+    "dotenv": "python-dotenv",
+    "googleapiclient": "google-api-python-client",
+    "jose": "python-jose",
+    "jwt": "pyjwt",
+    "magic": "python-magic",
+    "multipart": "python-multipart",
+    "pptx": "python-pptx",
+    "docx": "python-docx",
+    "serial": "pyserial",
+    "slugify": "python-slugify",
+    "websocket": "websocket-client",
+    "socketio": "python-socketio",
+    "engineio": "python-engineio",
+    "fitz": "pymupdf",
+    "dns": "dnspython",
+    "setuptools": "setuptools",
+    "pkg_resources": "setuptools",
+    "prometheus_client": "prometheus-client",
+}
+
+BUILD_TOOLS = {
+    "setuptools",
+    "wheel",
+    "pip",
+    "build",
+    "flit_core",
+    "hatchling",
+    "poetry_core",
+    "poetry-core",
+    "pkg_resources",
+    "distutils",
 }
 
 
@@ -246,11 +289,19 @@ class DependencyAnalyzer:
             context.project_name.lower(),
         }
         for sf in context.source_files:
+            local_modules.add(sf.path.stem.lower().replace("-", "_"))
+            if sf.module_name:
+                for part in sf.module_name.split("."):
+                    local_modules.add(part.lower().replace("-", "_"))
             parts = list(sf.relative_path.parts)
             if parts:
                 if parts[0] in ("src", "lib") and len(parts) > 1:
                     local_modules.add(parts[1].replace(".py", "").lower().replace("-", "_"))
                 local_modules.add(parts[0].replace(".py", "").lower().replace("-", "_"))
+
+        has_build_manifest = any(
+            m.name in ("setup.py", "setup.cfg", "pyproject.toml") for m in context.manifest_files
+        )
 
         seen_missing: set[str] = set()
 
@@ -260,6 +311,9 @@ class DependencyAnalyzer:
 
             top_level = imp.module_name.split(".")[0]
             top_level_norm = top_level.lower().replace("-", "_")
+            mapped_pkg = KNOWN_IMPORT_TO_PKG.get(top_level.lower(), top_level.lower()).replace(
+                "-", "_"
+            )
 
             if (
                 top_level in STDLIB_MODULES
@@ -267,32 +321,88 @@ class DependencyAnalyzer:
                 or top_level_norm in local_modules
                 or top_level_norm in declared_names
                 or top_level.lower() in declared_raw_names
+                or mapped_pkg in declared_names
+                or mapped_pkg in declared_raw_names
             ):
                 continue
 
+            # Check build tools exemption for build/setup files or projects with build manifest
+            if top_level_norm in BUILD_TOOLS or mapped_pkg in BUILD_TOOLS:
+                if has_build_manifest or imp.source_file.name in (
+                    "setup.py",
+                    "conftest.py",
+                    "conf.py",
+                ):
+                    continue
+
             # If it's missing from declared dependencies
-            if top_level_norm not in seen_missing:
+            if top_level_norm not in seen_missing and mapped_pkg not in seen_missing:
                 seen_missing.add(top_level_norm)
+                seen_missing.add(mapped_pkg)
                 rel_path = (
                     imp.source_file.relative_to(context.project_root)
                     if imp.source_file.is_relative_to(context.project_root)
                     else imp.source_file
                 )
+
+                # Check if this package is provided transitively by a declared dependency
+                transitive_provider: str | None = None
+                for dep in context.dependencies:
+                    dep_dist = context.installed_packages.get(
+                        dep.name.lower().replace("-", "_")
+                    ) or context.installed_packages.get(dep.name.lower())
+                    if dep_dist:
+                        for req_str in dep_dist.requires:
+                            try:
+                                req_name = Requirement(req_str).name.lower().replace("-", "_")
+                                if req_name in (top_level_norm, mapped_pkg):
+                                    transitive_provider = dep.name
+                                    break
+                            except Exception:
+                                pass
+                    if transitive_provider:
+                        break
+
+                evidence_list = [
+                    Evidence(
+                        fact=f"Import statement: `import {imp.module_name}` in {rel_path}:{imp.line_number}",
+                        source=str(rel_path),
+                    )
+                ]
+                if transitive_provider:
+                    evidence_list.append(
+                        Evidence(
+                            fact=f"'{top_level}' is currently installed as a transitive dependency via '{transitive_provider}', but is not declared directly.",
+                            source=f"{transitive_provider} metadata",
+                        )
+                    )
+
+                target_manifest = (
+                    context.manifest_files[0].name if context.manifest_files else "pyproject.toml"
+                )
+
+                if transitive_provider:
+                    diag_severity = Severity.WARNING
+                    diag_title = f"Undeclared transitive dependency: {top_level}"
+                    diag_msg = (
+                        f"Module '{top_level}' is imported in {rel_path}:{imp.line_number} and provided "
+                        f"transitively by '{transitive_provider}', but is not declared directly in project dependencies."
+                    )
+                else:
+                    diag_severity = Severity.ERROR
+                    diag_title = f"Missing dependency: {top_level}"
+                    diag_msg = f"Module '{top_level}' is imported in {rel_path}:{imp.line_number} but is not declared in project dependencies."
+
                 diag = Diagnostic(
                     id=rule.id,
-                    severity=rule.default_severity,
+                    severity=diag_severity,
                     category=rule.category,
-                    title=f"Missing dependency: {top_level}",
-                    message=f"Module '{top_level}' is imported in {rel_path}:{imp.line_number} but is not declared in project dependencies.",
-                    evidence=[
-                        Evidence(
-                            fact=f"Import statement: `import {imp.module_name}` in {rel_path}:{imp.line_number}",
-                            source=str(rel_path),
-                        )
-                    ],
+                    title=diag_title,
+                    message=diag_msg,
+                    evidence=evidence_list,
                     suggestions=[
                         Suggestion(
-                            description=f"Add '{top_level}' to project dependencies in pyproject.toml.",
+                            description=f"Add '{top_level}' directly to project dependencies in {target_manifest}.",
                             command=f"{context.package_manager} add {top_level}"
                             if context.package_manager in ("uv", "poetry")
                             else f"pip install {top_level}",
@@ -314,11 +424,24 @@ class DependencyAnalyzer:
         if not rule or not context.source_files:
             return diagnostics
 
-        imported_top_levels = {
-            imp.module_name.split(".")[0].lower().replace("-", "_")
-            for imp in context.imports
-            if imp.module_name
-        }
+        imported_top_levels: set[str] = set()
+        for imp in context.imports:
+            mod_to_check = (
+                imp.resolved_module
+                if (imp.is_relative and imp.resolved_module)
+                else imp.module_name
+            )
+            if mod_to_check:
+                top = mod_to_check.split(".")[0].lower().replace("-", "_")
+                imported_top_levels.add(top)
+                if top in KNOWN_IMPORT_TO_PKG:
+                    imported_top_levels.add(KNOWN_IMPORT_TO_PKG[top].lower().replace("-", "_"))
+            for sym in imp.imported_symbols:
+                imported_top_levels.add(sym.lower().replace("-", "_"))
+                if sym.lower() in KNOWN_IMPORT_TO_PKG:
+                    imported_top_levels.add(
+                        KNOWN_IMPORT_TO_PKG[sym.lower()].lower().replace("-", "_")
+                    )
 
         for dep in context.dependencies:
             if dep.is_dev:

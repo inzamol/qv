@@ -62,6 +62,21 @@ pydoctor = "qv.cli.main:cli"
 [tool.hatch.build.targets.wheel]
 packages = ["src/qv"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.github",
+    "/docs",
+    "/dev_docs",
+    "/examples",
+    "/site",
+    "/uv.lock",
+    "/.coverage",
+    "/.pre-commit-config.yaml",
+    "/.pre-commit-hooks.yaml",
+    "/.readthedocs.yaml",
+    "/tox.ini",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

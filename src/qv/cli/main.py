@@ -77,6 +77,26 @@ def cli() -> None:
     is_flag=True,
     help="Emit GitHub Actions inline workflow command annotations.",
 )
+@click.option(
+    "--hide-warnings",
+    "--no-warnings",
+    "-W",
+    is_flag=True,
+    help="Hide warning diagnostics from output.",
+)
+@click.option(
+    "--errors-only",
+    "-E",
+    is_flag=True,
+    help="Only show error diagnostics (hide warnings and info).",
+)
+@click.option(
+    "--severity",
+    "--min-severity",
+    "min_severity",
+    type=click.Choice(["error", "warning", "info"], case_sensitive=False),
+    help="Filter findings by minimum severity level.",
+)
 def scan(
     path: Path,
     strict: bool,
@@ -87,6 +107,9 @@ def scan(
     offline: bool,
     html_output: Path | None,
     github_annotations: bool,
+    hide_warnings: bool = False,
+    errors_only: bool = False,
+    min_severity: str | None = None,
 ) -> None:
     """Scan a Python project and report health findings."""
     try:
@@ -96,6 +119,12 @@ def scan(
             config.strict = True
         if offline:
             config.offline = True
+        if hide_warnings:
+            config.hide_warnings = True
+        if errors_only:
+            config.errors_only = True
+        if min_severity:
+            config.min_severity = Severity(min_severity.lower())
 
         discovery = ProjectDiscovery(root=path, config=config)
         context = discovery.discover_context()

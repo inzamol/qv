@@ -12,7 +12,7 @@ from qv.analyzers.security.analyzer import SecurityAnalyzer
 from qv.core.analyzer import Analyzer
 from qv.core.config import QvConfig
 from qv.core.context import ProjectContext
-from qv.core.models import Diagnostic, RootCause, ScanResult, Suggestion
+from qv.core.models import Diagnostic, RootCause, ScanResult, Severity, Suggestion
 from qv.frameworks.fastapi import FastApiAnalyzer
 from qv.frameworks.sqlalchemy import SqlAlchemyAnalyzer
 
@@ -60,6 +60,16 @@ class AnalysisEngine:
                 continue
 
             effective_sev = self.config.get_effective_severity(diag.id, diag.severity)
+
+            if self.config.hide_warnings and effective_sev == Severity.WARNING:
+                continue
+            if self.config.errors_only and effective_sev != Severity.ERROR:
+                continue
+            if self.config.min_severity:
+                sev_order = {Severity.ERROR: 3, Severity.WARNING: 2, Severity.INFO: 1}
+                if sev_order.get(effective_sev, 0) < sev_order.get(self.config.min_severity, 0):
+                    continue
+
             updated_diag = diag.model_copy(update={"severity": effective_sev})
             filtered_diagnostics.append(updated_diag)
 

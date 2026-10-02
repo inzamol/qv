@@ -173,3 +173,66 @@ def test_imp_004_deprecated_stdlib_detection(tmp_path: Path):
     distutils_diag = next(d for d in stdlib_diags if "distutils" in d.title)
     assert distutils_diag.severity == Severity.ERROR
     assert "setuptools" in distutils_diag.suggestions[0].description
+
+
+def test_imp_002_relative_imports_resolved(tmp_path: Path):
+    runtime = PythonRuntime("3.12.0", 3, 12, 0)
+    app_file = tmp_path / "myapp" / "app.py"
+    events_file = tmp_path / "myapp" / "events.py"
+
+    context = ProjectContext(
+        project_root=tmp_path,
+        project_name="myapp",
+        python_runtime=runtime,
+        package_manager="uv",
+        manifest_files=(),
+        lock_files=(),
+        dependencies=(),
+        installed_packages={},
+        source_files=(
+            SourceFile(
+                path=app_file,
+                relative_path=Path("myapp/app.py"),
+                content="from . import events\nfrom .events import handle_event",
+                module_name="myapp.app",
+            ),
+            SourceFile(
+                path=events_file,
+                relative_path=Path("myapp/events.py"),
+                content="def handle_event(): pass",
+                module_name="myapp.events",
+            ),
+        ),
+        imports=(
+            ImportRecord(
+                module_name="",
+                source_file=app_file,
+                line_number=1,
+                is_relative=True,
+                imported_symbols=("events",),
+                level=1,
+                resolved_module="myapp",
+            ),
+            ImportRecord(
+                module_name="events",
+                source_file=app_file,
+                line_number=2,
+                is_relative=True,
+                imported_symbols=("handle_event",),
+                level=1,
+                resolved_module="myapp.events",
+            ),
+        ),
+        docker=DockerConfig(has_dockerfile=False),
+        ci=CIConfig(has_ci=False),
+    )
+
+    analyzer = ImportAnalyzer()
+    diagnostics = analyzer.analyze(context)
+
+    unresolved_diags = [d for d in diagnostics if d.id == "IMP-002"]
+    assert len(unresolved_diags) == 0
+
+    dead_diags = [d for d in diagnostics if d.id == "IMP-003"]
+    # myapp.events is imported by myapp.app via relative import so it is not dead
+    assert not any("myapp.events" in d.title for d in dead_diags)
