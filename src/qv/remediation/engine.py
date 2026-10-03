@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -109,17 +110,28 @@ class RemediationEngine:
             # Handle command suggestions (e.g. DEP-001, DEP-005)
             elif diag.suggestions:
                 for s_idx, sugg in enumerate(diag.suggestions):
-                    if sugg.command:
-                        actions.append(
-                            FixAction(
-                                id=f"fix-cmd-{diag.id}-{idx}-{s_idx}",
-                                rule_id=diag.id,
-                                action_type=FixActionType.EXECUTE_COMMAND,
-                                description=sugg.description,
-                                command=sugg.command,
-                                is_safe=sugg.is_safe,
+                    if sugg.executable or sugg.command:
+                        executable = sugg.executable
+                        args = list(sugg.args) if sugg.args else []
+                        if not executable and sugg.command:
+                            parsed = shlex.split(sugg.command)
+                            if parsed:
+                                executable = parsed[0]
+                                args = parsed[1:]
+
+                        if executable:
+                            actions.append(
+                                FixAction(
+                                    id=f"fix-cmd-{diag.id}-{idx}-{s_idx}",
+                                    rule_id=diag.id,
+                                    action_type=FixActionType.EXECUTE_COMMAND,
+                                    description=sugg.description,
+                                    executable=executable,
+                                    args=args,
+                                    command=sugg.command or f"{executable} {' '.join(args)}",
+                                    is_safe=sugg.is_safe,
+                                )
                             )
-                        )
 
         return FixPlan(project_path=str(self.root), actions=actions)
 
@@ -166,8 +178,8 @@ class RemediationEngine:
                     result.applied.append(action)
 
                 elif action.action_type == FixActionType.EXECUTE_COMMAND:
-                    if execute_commands and action.command:
-                        self._execute_command(action.command)
+                    if execute_commands and (action.executable or action.command):
+                        self._execute_command(action)
                         result.applied.append(action)
                     else:
                         result.skipped.append(action)
@@ -291,11 +303,54 @@ dependencies = []
             updated = default_section + "\n" + content
             pyproject_file.write_text(updated, encoding="utf-8")
 
-    def _execute_command(self, command: str) -> None:
-        """Safely execute a suggested remediation shell command in project root."""
-        subprocess.run(
-            command,
-            shell=True,
+    ALLOWED_PACKAGE_MANAGERS: set[str] = {
+        "uv",
+        "poetry",
+        "pip",
+        "pdm",
+        "pipenv",
+        "flit",
+        "hatch",
+        "python",
+        "python3",
+    }
+
+    def _execute_command(self, action: FixAction | str) -> subprocess.CompletedProcess[bytes]:
+        """Safely execute a suggested remediation command using structured arguments."""
+        if isinstance(action, str):
+            parsed = shlex.split(action)
+            if not parsed:
+                raise ValueError("Remediation command cannot be empty.")
+            executable = parsed[0]
+            args = parsed[1:]
+        else:
+            executable = action.executable
+            args = list(action.args) if action.args else []
+            if not executable and action.command:
+                parsed = shlex.split(action.command)
+                if parsed:
+                    executable = parsed[0]
+                    args = parsed[1:]
+
+        if not executable or not executable.strip():
+            raise ValueError("Remediation command executable cannot be empty.")
+
+        executable = executable.strip()
+        exe_path = Path(executable)
+        exe_name = exe_path.name.lower()
+        if exe_name.endswith(".exe"):
+            exe_name = exe_name[:-4]
+
+        if exe_name not in self.ALLOWED_PACKAGE_MANAGERS:
+            raise ValueError(
+                f"Executable '{executable}' is not an allowed remediation command. "
+                f"Allowed executables: {', '.join(sorted(self.ALLOWED_PACKAGE_MANAGERS))}"
+            )
+
+        cmd_list = [executable, *args]
+        return subprocess.run(
+            cmd_list,
+            shell=False,
             cwd=self.root,
             check=True,
             capture_output=True,

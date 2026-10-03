@@ -59,12 +59,18 @@ class SecurityAnalyzer:
                 suggestions: list[Suggestion] = []
                 if vuln.fixed_versions:
                     latest_fix = vuln.fixed_versions[-1]
+                    if context.package_manager == "uv":
+                        executable = "uv"
+                        args = ["add", f"{pkg.name}>={latest_fix}"]
+                    else:
+                        executable = "pip"
+                        args = ["install", "--upgrade", f"{pkg.name}>={latest_fix}"]
                     suggestions.append(
                         Suggestion(
                             description=f"Upgrade '{pkg.name}' to version >={latest_fix} to remediate this vulnerability.",
-                            command=f"uv add '{pkg.name}>={latest_fix}'"
-                            if context.package_manager == "uv"
-                            else f"pip install --upgrade '{pkg.name}>={latest_fix}'",
+                            executable=executable,
+                            args=args,
+                            command=f"{executable} {' '.join(args)}",
                             is_safe=True,
                         )
                     )

@@ -31,6 +31,8 @@ class Suggestion(BaseModel):
 
     description: str
     command: str | None = None
+    executable: str | None = None
+    args: list[str] = Field(default_factory=list)
     code_snippet: str | None = None
     is_safe: bool = True
 
