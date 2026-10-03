@@ -29,6 +29,8 @@ class FixAction(BaseModel):
     target_file: str | None = None
     diff: str | None = None
     command: str | None = None
+    executable: str | None = None
+    args: list[str] = Field(default_factory=list)
     is_safe: bool = True
     metadata: dict[str, Any] = Field(default_factory=dict)
 

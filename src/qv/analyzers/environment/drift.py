@@ -66,6 +66,10 @@ class EnvironmentAnalyzer:
                             suggestions=[
                                 Suggestion(
                                     description=f"Use Python {target_python} for your virtual environment.",
+                                    executable="uv" if context.package_manager == "uv" else None,
+                                    args=["venv", "--python", target_python]
+                                    if context.package_manager == "uv"
+                                    else [],
                                     command=f"uv venv --python {target_python}"
                                     if context.package_manager == "uv"
                                     else None,

@@ -197,3 +197,110 @@ dependencies = []
     # Verify httpx was added to pyproject.toml
     content = pyproject.read_text(encoding="utf-8")
     assert "httpx" in content
+
+
+def test_remediation_execute_command_structured(tmp_path: Path, monkeypatch):
+    """Test that command execution uses structured arguments with shell=False."""
+    import subprocess
+
+    from qv.remediation.models import FixAction
+
+    engine = RemediationEngine(project_root=tmp_path)
+    recorded_calls = []
+
+    def mock_run(cmd, shell=False, cwd=None, check=True, capture_output=True):
+        recorded_calls.append({"cmd": cmd, "shell": shell, "cwd": cwd})
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    action = FixAction(
+        id="fix-cmd-1",
+        rule_id="DEP-005",
+        action_type=FixActionType.EXECUTE_COMMAND,
+        description="Sync lockfile",
+        executable="uv",
+        args=["sync", "--frozen"],
+    )
+
+    engine._execute_command(action)
+
+    assert len(recorded_calls) == 1
+    assert recorded_calls[0]["cmd"] == ["uv", "sync", "--frozen"]
+    assert recorded_calls[0]["shell"] is False
+    assert recorded_calls[0]["cwd"] == tmp_path.resolve()
+
+
+def test_remediation_rejects_unauthorized_executable(tmp_path: Path):
+    """Test that executables not in the allowed list are rejected."""
+    import pytest
+
+    from qv.remediation.models import FixAction
+
+    engine = RemediationEngine(project_root=tmp_path)
+
+    action = FixAction(
+        id="fix-cmd-bad",
+        rule_id="SEC-001",
+        action_type=FixActionType.EXECUTE_COMMAND,
+        description="Run malicious script",
+        executable="bash",
+        args=["-c", "echo pwned"],
+    )
+
+    with pytest.raises(ValueError, match="not an allowed remediation command"):
+        engine._execute_command(action)
+
+
+def test_remediation_rejects_empty_executable(tmp_path: Path):
+    """Test that empty executables are rejected."""
+    import pytest
+
+    from qv.remediation.models import FixAction
+
+    engine = RemediationEngine(project_root=tmp_path)
+
+    action = FixAction(
+        id="fix-cmd-empty",
+        rule_id="SEC-001",
+        action_type=FixActionType.EXECUTE_COMMAND,
+        description="Run empty command",
+        executable="",
+        args=[],
+    )
+
+    with pytest.raises(ValueError, match="executable cannot be empty"):
+        engine._execute_command(action)
+
+
+def test_remediation_shell_metacharacters_not_interpreted(tmp_path: Path, monkeypatch):
+    """Security test: Ensure shell metacharacters are treated as literal arguments."""
+    import subprocess
+
+    from qv.remediation.models import FixAction
+
+    engine = RemediationEngine(project_root=tmp_path)
+    recorded_calls = []
+
+    def mock_run(cmd, shell=False, cwd=None, check=True, capture_output=True):
+        recorded_calls.append({"cmd": cmd, "shell": shell})
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    # An argument containing shell injection attempt
+    malicious_arg = "requests; rm -rf /; echo $(whoami)"
+    action = FixAction(
+        id="fix-cmd-meta",
+        rule_id="DEP-002",
+        action_type=FixActionType.EXECUTE_COMMAND,
+        description="Add dependency",
+        executable="pip",
+        args=["install", malicious_arg],
+    )
+
+    engine._execute_command(action)
+
+    assert len(recorded_calls) == 1
+    assert recorded_calls[0]["shell"] is False
+    assert recorded_calls[0]["cmd"] == ["pip", "install", malicious_arg]

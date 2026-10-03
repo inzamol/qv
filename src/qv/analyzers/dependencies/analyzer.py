@@ -238,6 +238,13 @@ class DependencyAnalyzer:
                             if req.specifier and not req.specifier.contains(
                                 dep_ver, prereleases=True
                             ):
+                                if context.package_manager in ("uv", "poetry"):
+                                    sugg_exe = context.package_manager
+                                    sugg_args = ["add", f"{installed_dep.name}{req.specifier}"]
+                                else:
+                                    sugg_exe = "pip"
+                                    sugg_args = ["install", f"{installed_dep.name}{req.specifier}"]
+
                                 diag = Diagnostic(
                                     id=rule.id,
                                     severity=rule.default_severity,
@@ -257,9 +264,9 @@ class DependencyAnalyzer:
                                     suggestions=[
                                         Suggestion(
                                             description=f"Upgrade {dist.name} or pin {installed_dep.name} to {req.specifier}.",
-                                            command=f"{context.package_manager} add '{installed_dep.name}{req.specifier}'"
-                                            if context.package_manager in ("uv", "poetry")
-                                            else f"pip install '{installed_dep.name}{req.specifier}'",
+                                            executable=sugg_exe,
+                                            args=sugg_args,
+                                            command=f"{sugg_exe} {' '.join(sugg_args)}",
                                         )
                                     ],
                                     affected_packages=[dist.name, installed_dep.name],
@@ -393,6 +400,13 @@ class DependencyAnalyzer:
                     diag_title = f"Missing dependency: {top_level}"
                     diag_msg = f"Module '{top_level}' is imported in {rel_path}:{imp.line_number} but is not declared in project dependencies."
 
+                if context.package_manager in ("uv", "poetry"):
+                    add_exe = context.package_manager
+                    add_args = ["add", top_level]
+                else:
+                    add_exe = "pip"
+                    add_args = ["install", top_level]
+
                 diag = Diagnostic(
                     id=rule.id,
                     severity=diag_severity,
@@ -403,9 +417,9 @@ class DependencyAnalyzer:
                     suggestions=[
                         Suggestion(
                             description=f"Add '{top_level}' directly to project dependencies in {target_manifest}.",
-                            command=f"{context.package_manager} add {top_level}"
-                            if context.package_manager in ("uv", "poetry")
-                            else f"pip install {top_level}",
+                            executable=add_exe,
+                            args=add_args,
+                            command=f"{add_exe} {' '.join(add_args)}",
                         )
                     ],
                     affected_packages=[top_level],
@@ -467,6 +481,12 @@ class DependencyAnalyzer:
                     suggestions=[
                         Suggestion(
                             description=f"Remove '{dep.name}' from dependencies if not needed at runtime.",
+                            executable=context.package_manager
+                            if context.package_manager in ("uv", "poetry")
+                            else None,
+                            args=["remove", dep.name]
+                            if context.package_manager in ("uv", "poetry")
+                            else [],
                             command=f"{context.package_manager} remove {dep.name}"
                             if context.package_manager in ("uv", "poetry")
                             else None,
@@ -497,6 +517,13 @@ class DependencyAnalyzer:
                     spec = SpecifierSet(dep.specifier)
                     installed_ver = Version(installed.version)
                     if not spec.contains(installed_ver, prereleases=True):
+                        if context.package_manager in ("uv", "poetry"):
+                            sync_exe = context.package_manager
+                            sync_args = ["sync"]
+                        else:
+                            sync_exe = "pip"
+                            sync_args = ["install", "-r", dep.source_file.name]
+
                         diag = Diagnostic(
                             id=rule.id,
                             severity=rule.default_severity,
@@ -516,9 +543,9 @@ class DependencyAnalyzer:
                             suggestions=[
                                 Suggestion(
                                     description="Synchronize the virtual environment with project manifest.",
-                                    command=f"{context.package_manager} sync"
-                                    if context.package_manager in ("uv", "poetry")
-                                    else f"pip install -r {dep.source_file.name}",
+                                    executable=sync_exe,
+                                    args=sync_args,
+                                    command=f"{sync_exe} {' '.join(sync_args)}",
                                 )
                             ],
                             affected_packages=[dep.name],

@@ -20,6 +20,7 @@ from qv.core.models import Severity
 from qv.core.project import ProjectDiscovery
 from qv.frameworks import AVAILABLE_FRAMEWORK_ANALYZERS
 from qv.remediation.engine import RemediationEngine
+from qv.remediation.models import FixActionType
 from qv.reporters.github_annotator import GitHubAnnotator
 from qv.reporters.html_reporter import HtmlReporter
 from qv.reporters.json_reporter import JsonReporter
@@ -385,9 +386,15 @@ def fix_cmd(
         table.add_column("Type", style="dim")
 
         for act in plan.actions:
+            target = act.target_file
+            if not target and act.action_type == FixActionType.EXECUTE_COMMAND:
+                if act.executable:
+                    target = f"{act.executable} {' '.join(act.args)}"
+                else:
+                    target = act.command or "command"
             table.add_row(
                 act.rule_id,
-                act.target_file or "shell",
+                target or "pyproject.toml",
                 act.description,
                 act.action_type.value,
             )
