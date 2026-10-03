@@ -55,6 +55,21 @@ class Diagnostic(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class AnalyzerStatus(str, Enum):
+    OK = "ok"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class AnalyzerExecutionResult(BaseModel):
+    """Execution status and metadata for an individual analyzer."""
+
+    analyzer_name: str
+    status: AnalyzerStatus
+    error: str | None = None
+    diagnostics_count: int = 0
+
+
 class RootCause(BaseModel):
     """Group of related symptoms belonging to one underlying root cause."""
 
@@ -73,6 +88,8 @@ class ScanSummary(BaseModel):
     warnings_count: int = 0
     info_count: int = 0
     checks_passed: int = 0
+    analyzers_run: int = 0
+    analyzers_failed: int = 0
     health_score: int = 100
 
 
@@ -86,11 +103,16 @@ class ScanResult(BaseModel):
     summary: ScanSummary
     diagnostics: list[Diagnostic] = Field(default_factory=list)
     root_causes: list[RootCause] = Field(default_factory=list)
+    analyzer_results: list[AnalyzerExecutionResult] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def has_blocking_errors(self) -> bool:
-        return self.summary.errors_count > 0
+        return self.summary.errors_count > 0 or self.summary.analyzers_failed > 0
+
+    @property
+    def has_analyzer_failures(self) -> bool:
+        return self.summary.analyzers_failed > 0
 
     @property
     def health_score(self) -> int:
@@ -118,14 +140,19 @@ class ScanResult(BaseModel):
         diagnostics: list[Diagnostic],
         checks_passed: int = 0,
         root_causes: list[RootCause] | None = None,
+        analyzer_results: list[AnalyzerExecutionResult] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> ScanResult:
         errors = sum(1 for d in diagnostics if d.severity == Severity.ERROR)
         warnings = sum(1 for d in diagnostics if d.severity == Severity.WARNING)
         infos = sum(1 for d in diagnostics if d.severity == Severity.INFO)
 
-        # Health score calculation (100 base, deductions for errors and warnings)
-        penalty = (errors * 15) + (warnings * 5)
+        results = analyzer_results or []
+        analyzers_run = len(results)
+        analyzers_failed = sum(1 for r in results if r.status == AnalyzerStatus.FAILED)
+
+        # Health score calculation (100 base, deductions for errors, warnings, and analyzer crashes)
+        penalty = (errors * 15) + (warnings * 5) + (analyzers_failed * 25)
         health_score = max(0, min(100, 100 - penalty))
 
         summary = ScanSummary(
@@ -133,6 +160,8 @@ class ScanResult(BaseModel):
             warnings_count=warnings,
             info_count=infos,
             checks_passed=checks_passed,
+            analyzers_run=analyzers_run,
+            analyzers_failed=analyzers_failed,
             health_score=health_score,
         )
 
@@ -144,5 +173,6 @@ class ScanResult(BaseModel):
             summary=summary,
             diagnostics=diagnostics,
             root_causes=root_causes or [],
+            analyzer_results=results,
             metadata=metadata or {},
         )

@@ -775,6 +775,16 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         remediation_hint="Always close raw DBAPI connections in a try...finally block: 'raw_conn = engine.raw_connection(); try: ... finally: raw_conn.close()'.",
         doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-030--direct-dbapi-rawconnection-used-without-cleanup",
     ),
+    # Engine execution rules
+    "ENG-001": RuleDefinition(
+        id="ENG-001",
+        category="engine",
+        title="Analyzer execution failed",
+        description="An analyzer raised an unexpected exception during execution.",
+        default_severity=Severity.ERROR,
+        remediation_hint="Check the error message or report a bug to the analyzer maintainer.",
+        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#eng-001--analyzer-execution-failed",
+    ),
 }
 
 

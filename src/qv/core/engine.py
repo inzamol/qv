@@ -12,7 +12,16 @@ from qv.analyzers.security.analyzer import SecurityAnalyzer
 from qv.core.analyzer import Analyzer
 from qv.core.config import QvConfig
 from qv.core.context import ProjectContext
-from qv.core.models import Diagnostic, RootCause, ScanResult, Severity, Suggestion
+from qv.core.models import (
+    AnalyzerExecutionResult,
+    AnalyzerStatus,
+    Diagnostic,
+    Evidence,
+    RootCause,
+    ScanResult,
+    Severity,
+    Suggestion,
+)
 from qv.frameworks.fastapi import FastApiAnalyzer
 from qv.frameworks.sqlalchemy import SqlAlchemyAnalyzer
 
@@ -42,16 +51,57 @@ class AnalysisEngine:
     def run(self, context: ProjectContext) -> ScanResult:
         """Run all registered analyzers against the given ProjectContext."""
         raw_diagnostics: list[Diagnostic] = []
+        analyzer_results: list[AnalyzerExecutionResult] = []
         checks_evaluated = 0
 
         for analyzer in self.analyzers:
             checks_evaluated += 1
+            analyzer_name = getattr(analyzer, "name", analyzer.__class__.__name__)
             try:
                 findings = analyzer.analyze(context)
                 raw_diagnostics.extend(findings)
-            except Exception:
-                # Keep engine resilient
-                pass
+                analyzer_results.append(
+                    AnalyzerExecutionResult(
+                        analyzer_name=analyzer_name,
+                        status=AnalyzerStatus.OK,
+                        diagnostics_count=len(findings),
+                    )
+                )
+            except Exception as exc:
+                error_msg = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+                analyzer_results.append(
+                    AnalyzerExecutionResult(
+                        analyzer_name=analyzer_name,
+                        status=AnalyzerStatus.FAILED,
+                        error=error_msg,
+                        diagnostics_count=0,
+                    )
+                )
+                diag = Diagnostic(
+                    id="ENG-001",
+                    severity=Severity.ERROR,
+                    category="engine",
+                    title=f"Analyzer execution failed: {analyzer_name}",
+                    message=f"Analyzer '{analyzer_name}' failed with unexpected error: {error_msg}",
+                    evidence=[
+                        Evidence(
+                            fact=f"Analyzer: {analyzer_name}",
+                            source="AnalysisEngine",
+                        ),
+                        Evidence(
+                            fact=f"Error: {error_msg}",
+                            source="Exception",
+                        ),
+                    ],
+                    suggestions=[
+                        Suggestion(
+                            description=f"Inspect project files or report an issue for {analyzer_name}.",
+                            is_safe=False,
+                        )
+                    ],
+                    metadata={"analyzer": analyzer_name, "error": error_msg},
+                )
+                raw_diagnostics.append(diag)
 
         # Apply configuration (filtering and severity overrides)
         filtered_diagnostics: list[Diagnostic] = []
@@ -87,6 +137,7 @@ class AnalysisEngine:
             diagnostics=filtered_diagnostics,
             checks_passed=passed_count,
             root_causes=root_causes,
+            analyzer_results=analyzer_results,
         )
 
     def _correlate_root_causes(self, diagnostics: list[Diagnostic]) -> list[RootCause]:
