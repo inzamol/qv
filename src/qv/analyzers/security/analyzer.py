@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from qv.analyzers.security.lockfile_parser import LockfileParser
-from qv.analyzers.security.osv_client import OsvClient
+from qv.analyzers.security.osv_client import OsvClient, OsvUnavailableError
 from qv.core.context import ProjectContext
-from qv.core.models import Diagnostic, Evidence, Suggestion
+from qv.core.models import AnalyzerStatus, Diagnostic, Evidence, Severity, Suggestion
 from qv.rules.registry import get_rule_definition
 
 
@@ -20,15 +20,18 @@ class SecurityAnalyzer:
 
     def __init__(self, osv_client: OsvClient | None = None) -> None:
         self.osv_client = osv_client or OsvClient()
+        self.status: AnalyzerStatus = AnalyzerStatus.OK
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
+        self.status = AnalyzerStatus.OK
         rule = get_rule_definition("DEP-006")
         if not rule:
             return diagnostics
 
         # Skip if offline mode configured
         if context.config.get("offline", False):
+            self.status = AnalyzerStatus.SKIPPED
             return diagnostics
 
         # Parse resolved dependencies from lockfile or environment
@@ -37,7 +40,38 @@ class SecurityAnalyzer:
             return diagnostics
 
         pkg_tuples = [(p.name, p.version) for p in resolved_packages]
-        vulnerabilities_by_pkg = self.osv_client.query_packages(pkg_tuples)
+        try:
+            vulnerabilities_by_pkg = self.osv_client.query_packages(pkg_tuples)
+        except OsvUnavailableError as exc:
+            self.status = AnalyzerStatus.UNKNOWN
+            rule_sec = get_rule_definition("SEC-001")
+            return [
+                Diagnostic(
+                    id="SEC-001" if rule_sec else "DEP-006",
+                    severity=rule_sec.default_severity if rule_sec else Severity.WARNING,
+                    category="security",
+                    title="Security analysis unavailable",
+                    message="Security analysis unavailable (Status: UNKNOWN).",
+                    evidence=[
+                        Evidence(
+                            fact="Could not query OSV.dev advisory database (network unreachable or blocked)",
+                            source="OSV.dev API",
+                        ),
+                        Evidence(
+                            fact=f"Error: {exc}",
+                            source="OsvClient",
+                        ),
+                    ],
+                    suggestions=[
+                        Suggestion(
+                            description="Check internet connectivity or run with --offline to skip vulnerability checks.",
+                            is_safe=True,
+                        )
+                    ],
+                    metadata={"status": "UNKNOWN", "error": str(exc)},
+                    doc_url=rule_sec.doc_url if rule_sec else None,
+                )
+            ]
 
         for pkg in resolved_packages:
             key = (pkg.name.lower(), pkg.version)
