@@ -6,7 +6,7 @@ import ast
 import re
 
 from qv.core.context import ProjectContext
-from qv.core.models import Diagnostic, Evidence, Severity, Suggestion
+from qv.core.models import AnalyzerStatus, Diagnostic, Evidence, Severity, Suggestion
 from qv.frameworks.base import FrameworkPlugin
 from qv.rules.registry import get_rule_definition
 
@@ -73,6 +73,10 @@ class FastApiAnalyzer(FrameworkPlugin):
         "Comprehensive diagnostic suite for FastAPI applications covering async blocking calls, "
         "type safety, routing integrity, security configurations, cookie safety, and resource lifecycles."
     )
+    rules: tuple[str, ...] = tuple(f"FAP-{i:03d}" for i in range(1, 39))
+
+    def __init__(self) -> None:
+        self.status: AnalyzerStatus = AnalyzerStatus.OK
 
     def detect(self, context: ProjectContext) -> bool:
         """Check if FastAPI is used in dependencies, installed packages, or source imports."""
@@ -96,7 +100,10 @@ class FastApiAnalyzer(FrameworkPlugin):
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         """Analyze all source files in the project context for FastAPI diagnostics."""
         if not self.detect(context):
+            self.status = AnalyzerStatus.SKIPPED
             return []
+
+        self.status = AnalyzerStatus.OK
 
         diagnostics: list[Diagnostic] = []
 

@@ -18,6 +18,7 @@ class EnvironmentAnalyzer:
     description = (
         "Checks for Python runtime drift, Docker runtime drift, and CI test matrix mismatches."
     )
+    rules: tuple[str, ...] = ("ENV-001", "ENV-002", "ENV-003")
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []

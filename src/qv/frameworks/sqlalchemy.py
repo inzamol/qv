@@ -6,7 +6,7 @@ import ast
 import re
 
 from qv.core.context import ProjectContext
-from qv.core.models import Diagnostic, Evidence, Severity, Suggestion
+from qv.core.models import AnalyzerStatus, Diagnostic, Evidence, Severity, Suggestion
 from qv.frameworks.base import FrameworkPlugin
 from qv.rules.registry import get_rule_definition
 
@@ -40,6 +40,10 @@ class SqlAlchemyAnalyzer(FrameworkPlugin):
         "Detects N+1 query patterns, session lifecycle leaks, async blocking DB calls, "
         "SQL injection vulnerabilities, connection pool risks, schema integrity flaws, and modern 2.0 syntax."
     )
+    rules: tuple[str, ...] = tuple(f"SQL-{i:03d}" for i in range(1, 31))
+
+    def __init__(self) -> None:
+        self.status: AnalyzerStatus = AnalyzerStatus.OK
 
     def detect(self, context: ProjectContext) -> bool:
         """Detect if SQLAlchemy or SQL-related libraries are present in the project."""
@@ -61,7 +65,10 @@ class SqlAlchemyAnalyzer(FrameworkPlugin):
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         """Analyze project source files for SQL and SQLAlchemy diagnostics."""
         if not self.detect(context):
+            self.status = AnalyzerStatus.SKIPPED
             return []
+
+        self.status = AnalyzerStatus.OK
 
         diagnostics: list[Diagnostic] = []
         has_sqlalchemy_models = False

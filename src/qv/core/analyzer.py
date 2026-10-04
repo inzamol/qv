@@ -15,6 +15,7 @@ class Analyzer(Protocol):
     id: str
     name: str
     description: str
+    rules: tuple[str, ...]
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         """Analyze project context and return list of diagnostics."""

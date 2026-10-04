@@ -15,6 +15,7 @@ class FrameworkPlugin(Protocol):
     id: str
     name: str
     description: str
+    rules: tuple[str, ...]
 
     def detect(self, context: ProjectContext) -> bool:
         """Detect if this framework is actively used in the project."""

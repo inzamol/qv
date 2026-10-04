@@ -203,6 +203,13 @@ class DependencyAnalyzer:
     description = (
         "Checks for dependency conflicts, missing imports, unused packages, and version mismatches."
     )
+    rules: tuple[str, ...] = (
+        "DEP-001",
+        "DEP-002",
+        "DEP-003",
+        "DEP-004",
+        "DEP-005",
+    )
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
