@@ -2,8 +2,13 @@
 
 from pathlib import Path
 
-from qv.core.config import QvConfig
+import pytest
+from click.testing import CliRunner
+
+from qv.cli.main import cli
+from qv.core.config import ConfigurationError, QvConfig
 from qv.core.models import Severity
+from qv.core.project import load_project
 
 
 def test_default_config():
@@ -45,8 +50,6 @@ def test_strict_mode():
 
 def test_load_project_centralized(tmp_path: Path):
     """Test that load_project produces unified Project with config and context."""
-    from qv.core.project import load_project
-
     toml_file = tmp_path / "pyproject.toml"
     toml_file.write_text(
         """[project]
@@ -68,10 +71,6 @@ DEP-003 = "off"
 
 def test_cli_commands_share_configuration_suppression(tmp_path: Path):
     """Test that rule suppression in pyproject.toml behaves identically in scan and dependency commands."""
-    from click.testing import CliRunner
-
-    from qv.cli.main import cli
-
     toml_file = tmp_path / "pyproject.toml"
     toml_file.write_text(
         """[project]
@@ -97,3 +96,56 @@ DEP-003 = "off"
     print("DEP OUTPUT:", dep_res.output)
     assert "DEP-003" not in dep_res.output
     assert dep_res.exit_code == scan_res.exit_code
+
+
+def test_invalid_toml_syntax_raises_configuration_error(tmp_path: Path):
+    toml_file = tmp_path / "pyproject.toml"
+    toml_file.write_text("[tool.qv\ninvalid = true", encoding="utf-8")
+
+    with pytest.raises(ConfigurationError) as excinfo:
+        QvConfig.from_pyproject(toml_file)
+    assert "Failed to parse configuration file" in str(excinfo.value)
+
+
+def test_invalid_rule_severity_raises_configuration_error(tmp_path: Path):
+    toml_file = tmp_path / "pyproject.toml"
+    toml_file.write_text(
+        """
+[tool.qv.rules]
+DEP-001 = "not_a_valid_severity"
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError) as excinfo:
+        QvConfig.from_pyproject(toml_file)
+    assert "Invalid severity 'not_a_valid_severity'" in str(excinfo.value)
+
+
+def test_invalid_min_severity_raises_configuration_error(tmp_path: Path):
+    toml_file = tmp_path / "pyproject.toml"
+    toml_file.write_text(
+        """
+[tool.qv]
+min_severity = "fatal"
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError) as excinfo:
+        QvConfig.from_pyproject(toml_file)
+    assert "Invalid min_severity 'fatal'" in str(excinfo.value)
+
+
+def test_cli_exits_with_code_2_on_invalid_config(tmp_path: Path):
+    toml_file = tmp_path / "pyproject.toml"
+    toml_file.write_text("[tool.qv\ninvalid = true", encoding="utf-8")
+
+    runner = CliRunner()
+
+    for cmd in ["scan", "dependency", "environment", "architecture", "fix", "tree"]:
+        res = runner.invoke(cli, [cmd, str(tmp_path)])
+        assert res.exit_code == 2, (
+            f"Command '{cmd}' expected exit code 2, got {res.exit_code}: {res.output}"
+        )
+        assert "Configuration error:" in res.output
