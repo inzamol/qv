@@ -5,12 +5,16 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from qv import __version__
 from qv.core.models import ScanResult, Severity
 from qv.rules.registry import RULES_CATALOG
 
 
 class SarifReporter:
     """Generates standard SARIF v2.1.0 output for CI / Code Scanning integration."""
+
+    def __init__(self, tool_version: str | None = None) -> None:
+        self.tool_version = tool_version or __version__
 
     def render(self, result: ScanResult) -> str:
         """Render scan result to SARIF v2.1.0 JSON format."""
@@ -74,7 +78,7 @@ class SarifReporter:
                     "tool": {
                         "driver": {
                             "name": "qv",
-                            "semanticVersion": "0.1.0",
+                            "semanticVersion": self.tool_version,
                             "informationUri": "https://github.com/inzamol/qv",
                             "rules": rules_dict,
                         }
