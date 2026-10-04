@@ -281,6 +281,74 @@ dependencies = [
     assert "celery" not in content
 
 
+def test_remediation_requirements_exact_package_removal(tmp_path: Path):
+    """Test removing 'requests' from requirements.txt does not remove 'requests-cache' or 'requests-toolbelt'."""
+    req_file = tmp_path / "requirements.txt"
+    req_file.write_text(
+        "requests\nrequests-cache\nrequests-toolbelt\n",
+        encoding="utf-8",
+    )
+
+    engine = RemediationEngine(project_root=tmp_path)
+    engine._remove_dependency_from_requirements("requests")
+
+    content = req_file.read_text(encoding="utf-8")
+    assert "requests\n" not in content
+    assert "requests-cache" in content
+    assert "requests-toolbelt" in content
+
+
+def test_remediation_requirements_preserves_comments_and_options(tmp_path: Path):
+    """Test removing dependency preserves pip options, comments, and constraints."""
+    req_file = tmp_path / "requirements.txt"
+    req_file.write_text(
+        """# Production dependencies
+-r base.txt
+--extra-index-url https://pypi.org/simple
+requests>=2.31.0 # HTTP client
+requests-cache==1.2.0
+requests-toolbelt~=0.10.1
+""",
+        encoding="utf-8",
+    )
+
+    engine = RemediationEngine(project_root=tmp_path)
+    engine._remove_dependency_from_requirements("requests")
+
+    content = req_file.read_text(encoding="utf-8")
+    assert "requests>=2.31.0" not in content
+    assert "# Production dependencies" in content
+    assert "-r base.txt" in content
+    assert "--extra-index-url https://pypi.org/simple" in content
+    assert "requests-cache==1.2.0" in content
+    assert "requests-toolbelt~=0.10.1" in content
+
+
+def test_remediation_pyproject_exact_package_prefix_preservation(tmp_path: Path):
+    """Test removing 'requests' from pyproject.toml preserves 'requests-cache' and 'requests-toolbelt'."""
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """[project]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+    "requests>=2.31.0",
+    "requests-cache>=1.0.0",
+    "requests-toolbelt>=0.10.0",
+]
+""",
+        encoding="utf-8",
+    )
+
+    engine = RemediationEngine(project_root=tmp_path)
+    engine._remove_dependency_from_pyproject("requests")
+
+    content = pyproject.read_text(encoding="utf-8")
+    assert '"requests>=2.31.0"' not in content
+    assert '"requests-cache>=1.0.0"' in content
+    assert '"requests-toolbelt>=0.10.0"' in content
+
+
 def test_remediation_execute_command_structured(tmp_path: Path, monkeypatch):
     """Test that command execution uses structured arguments with shell=False."""
     import subprocess
