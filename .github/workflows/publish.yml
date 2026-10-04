@@ -26,6 +26,8 @@ jobs:
   validate:
     name: Validate Tag, Lint & Test Suite
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
