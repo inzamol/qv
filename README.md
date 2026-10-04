@@ -1,44 +1,46 @@
-# 🔍 qv
+# qv
 
 <div align="center">
 
-**Diagnose why your Python project is unhealthy — understand the root cause and get safe, actionable fixes.**
+### Modern diagnostic and health analyzer for Python projects
 
-[![PyPI Version](https://img.shields.io/badge/pypi-v0.1.0-blue.svg)](https://pypi.org/project/python-qv/)
-[![Python Versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/python-qv/)
-[![CI Status](https://github.com/inzamol/qv/actions/workflows/ci.yml/badge.svg)](https://github.com/inzamol/qv/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+Diagnose root causes across dependency resolvers, runtime environment drift, circular imports, and framework anti-patterns with safe, actionable fixes.
 
-[Installation](#-installation) • [Quick Start](#-quick-start) • [Interactive TUI](#-interactive-tui-explorer) • [Features](#-what-it-detects) • [CLI Commands](#-cli-commands) • [CI/CD Integration](#-cicd-integration) • [Documentation](https://inzamol.github.io/qv/)
+[![PyPI Version](https://img.shields.io/pypi/v/python-qv.svg?style=flat-square&color=2563eb)](https://pypi.org/project/python-qv/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/python-qv.svg?style=flat-square&color=2563eb)](https://pypi.org/project/python-qv/)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/inzamol/qv/ci.yml?branch=main&style=flat-square)](https://github.com/inzamol/qv/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-gray.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
+[Installation](#installation) &bull; [Quick Start](#quick-start) &bull; [Interactive TUI](#interactive-tui-explorer) &bull; [Rule Categories](#rule-categories--capabilities) &bull; [CLI Commands](#cli-commands--usage) &bull; [Configuration](#configuration) &bull; [CI/CD Integration](#cicd-integration) &bull; [Documentation](https://inzamol.github.io/qv/)
 
 </div>
 
 ---
 
-## 💡 Why qv?
+## Why qv
 
-Python projects rarely fail because of Python syntax. They fail because of **ecosystem friction**:
-- Incompatible transitive dependency constraints that break your resolver.
-- Missing dependencies you forgot to add to `pyproject.toml`.
-- Docker containers running Python 3.10 while your team develops on 3.12.
-- Silent circular imports that only crash at runtime when certain modules load.
+Python projects rarely fail because of syntax errors. They fail because of **ecosystem friction**:
+- Incompatible transitive dependency constraints that break package resolvers.
+- Missing dependencies imported in source files but omitted from `pyproject.toml`.
+- Docker containers pinned to older runtimes while developers work on newer Python releases.
+- Silent circular imports that only crash at runtime when specific execution paths trigger.
 
-Instead of parsing hundreds of lines of cryptic resolver logs, **`qv`** scans your project in milliseconds, pinpoints the root cause, shows the exact evidence, and gives you a copy-paste command to fix it.
+Instead of parsing hundreds of lines of cryptic resolver logs, **`qv`** analyzes your project in milliseconds, isolates the root cause, provides concrete evidence, and outputs copy-paste remediation commands.
 
 ```text
-🔍 qv
+qv
 Project: payment-service
 Python:  3.12.7
 Package Manager: uv
 
-🔴 1 Errors   🟡 1 Warnings   🟢 48 Checks Passed
+1 Errors   1 Warnings   48 Checks Passed
 
-┌────────────────── 🔴 DEP-001 Dependency constraint conflict ─────────────────┐
+┌────────────────── [ERROR] DEP-001 Dependency constraint conflict ───────────┐
 │ celery 5.4.0 requires kombu<5.4.0,>=5.3.0, but installed is kombu 5.5.2.     │
 │                                                                              │
 │ Evidence:                                                                    │
-│   • celery declared requirement: kombu<5.4.0,>=5.3.0                         │
-│   • Installed kombu version: 5.5.2 in active environment                     │
+│   - celery declared requirement: kombu<5.4.0,>=5.3.0                         │
+│   - Installed kombu version: 5.5.2 in active environment                     │
 │                                                                              │
 │ Suggested fix:                                                               │
 │   Upgrade celery or pin kombu to <5.4.0,>=5.3.0.                             │
@@ -50,9 +52,9 @@ Health Score: 85/100
 
 ---
 
-## 📦 Installation
+## Installation
 
-Install `python-qv` into your virtual environment (provides the `qv` CLI):
+Install `python-qv` via your preferred package manager (provides the `qv` binary):
 
 ```bash
 # Using pip
@@ -61,7 +63,7 @@ pip install python-qv
 # Using uv
 uv add python-qv --dev
 
-# Run directly without installing (via uvx or pipx)
+# Run ephemerally without installing
 uvx python-qv scan
 # or
 pipx run python-qv scan
@@ -69,268 +71,444 @@ pipx run python-qv scan
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Run a Health Scan
-
-Run `qv scan` inside any Python repository:
-
+Run `qv scan` in the root of any Python repository:
 ```bash
 qv scan
 ```
 
 ### 2. Launch the Interactive TUI Explorer
-
-Explore findings interactively with keyboard navigation, live details, dependency tree view, and 1-key remediation:
-
+Navigate findings with keyboard controls, view AST details, and trigger 1-key remediation:
 ```bash
 qv inspect
-# or
+# or shorthand
 qv ui
 ```
 
-### 3. Generate a Self-Contained HTML Report
-
-Export a standalone, interactive HTML report with score meters, search filters, and dark/light modes:
-
+### 3. Generate a Standalone HTML Report
+Export an interactive HTML dashboard with health metrics, filters, and dark/light modes:
 ```bash
 qv scan --html report.html
 ```
 
-### 4. Understand Any Flagged Issue
-
-Need more context on why a rule triggered? Run `explain`:
-
+### 4. Explain Any Rule
+Get full context, common causes, and remediation advice for any diagnostic rule code:
 ```bash
 qv explain DEP-001
 ```
 
-### 5. Add Project Configuration
-
-To add default configuration to your `pyproject.toml`:
-
+### 5. Initialize Configuration
+Add default configuration rules to `pyproject.toml` without overwriting existing settings:
 ```bash
 qv init
 ```
 
 ---
 
-## 🖥️ Interactive TUI Explorer
+## Interactive TUI Explorer
 
 Run `qv inspect` (or `qv ui`) for a full terminal dashboard:
 
 ```text
 ┌────────────────────────────────────────────── qv Explorer ──────────────────────────────────────────────┐
-│  🔍 qv Explorer  •  Project: all-in-one-demo  •  Health Score: 40/100                                   │
-│  Python: 3.12.7  |  Package Manager: PIP  |  Errors: 3  |  Warnings: 3  |  Checks Passed: 49            │
-├────────────────────────── Findings (1/6) ──────────────────────────┬──────────────── Details: DEP-001 ──┤
+│  qv Explorer  |  Project: payment-service  |  Health Score: 65/100                                       │
+│  Python: 3.12.7  |  Package Manager: uv  |  Errors: 2  |  Warnings: 1  |  Checks Passed: 48             │
+├────────────────────────── Findings (1/3) ──────────────────────────┬──────────────── Details: DEP-001 ──┤
 │     Sev   Rule     Title                                           │ [ERROR] DEP-001: Constraint conflict│
-│  👉 ERR   DEP-001  Dependency constraint conflict                  │ celery requires kombu<5.4.0,>=5.3.0│
+│  >  ERR   DEP-001  Dependency constraint conflict                  │ celery requires kombu<5.4.0,>=5.3.0│
 │     ERR   DEP-002  Missing dependency: httpx                       │ Location: pyproject.toml           │
-│     ERR   DEP-002  Missing dependency: pydantic                    │                                    │
-│     WARN  DEP-003  Unused declared dependency: requests            │ Remediation:                       │
-│     WARN  DEP-003  Unused declared dependency: pyyaml              │   👉 Pin kombu to <5.4.0,>=5.3.0   │
-│     ... 1 more below ...                                           │      $ pip install 'kombu<5.4.0'   │
+│     WARN  IMP-003  Unused / orphan module: legacy_calc.py          │                                    │
+│                                                                    │ Suggested Remediation:             │
+│                                                                    │   Pin kombu to <5.4.0,>=5.3.0      │
+│                                                                    │   $ uv add 'kombu<5.4.0'           │
 ├────────────────────────────────────────────────────────────────────┴────────────────────────────────────┤
-│ [↑/k, ↓/j] Navigate  •  [Enter] Expand  •  [f] Apply Fix  •  [t] Tree View  •  [q] Quit                 │
+│ [Up/k, Down/j] Navigate  |  [Enter] Expand  |  [f] Apply Fix  |  [t] Tree View  |  [q] Quit             │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **`↑ / k` & `↓ / j`**: Scroll smoothly through findings.
-- **`f`**: Apply automated remediation fix for the active finding.
+- **`Up / k` & `Down / j`**: Navigate findings list.
+- **`f`**: Apply automated remediation for selected finding.
 - **`t`**: Toggle between Findings view and live Dependency Tree.
-- **`Enter`**: Expand details panel.
+- **`Enter`**: Expand and focus finding details panel.
+- **`q`**: Exit dashboard.
 
 ---
 
-## 🔍 What It Detects
+## Rule Categories & Capabilities
 
-| Category | Rule ID | Description | Default Severity |
+`qv` features over 80 built-in rules across general and framework-specific analyzers:
+
+| Category | Rule IDs | Focus Area | Default Severity |
 |---|---|---|---|
-| **Dependencies** | `DEP-001` | Incompatible package version constraints across dependency tree | `ERROR` |
-| | `DEP-002` | Third-party packages imported in code but missing from `pyproject.toml` | `ERROR` |
-| | `DEP-003` | Declared dependencies that are never imported anywhere in project | `WARNING` |
-| | `DEP-004` | Package requires a Python version incompatible with target runtime | `WARNING` |
-| | `DEP-005` | Installed virtualenv version does not match declared manifest pin | `WARNING` |
-| **Environment** | `ENV-001` | Active interpreter version differs from project `requires-python` | `WARNING` |
-| | `ENV-002` | Dockerfile base image Python version differs from project runtime | `WARNING` |
-| | `ENV-003` | CI matrix does not cover the Python versions declared in project | `WARNING` |
-| **Architecture** | `IMP-001` | Circular import cycles across local modules | `ERROR` |
-| | `IMP-002` | Unresolved relative or internal module imports | `ERROR` |
-| **Packaging** | `PKG-001` | Missing PEP 621 metadata (name, version, etc.) | `WARNING` |
-| | `PKG-002` | Invalid syntax or malformed keys in `pyproject.toml` | `ERROR` |
-| **FastAPI Doctor** | `FAP-001`–`FAP-038` | Async blocking calls, CPU starvation in endpoints, insecure CORS, missing timeouts, lifecycle anti-patterns, Pydantic v2 migrations | `ERROR` / `WARNING` |
-| **SQL & Database** | `SQL-001`–`SQL-030` | N+1 queries in loops, session leaks, SQL injection, sync DB in async loop, missing eager loading, pool starvation, 2.0 syntax | `ERROR` / `WARNING` |
+| **Dependencies** | `DEP-001` - `DEP-006` | Constraint conflicts, undeclared imports, unused dependencies, Python version mismatches, security vulnerabilities | `ERROR` / `WARNING` |
+| **Environment** | `ENV-001` - `ENV-003` | Active interpreter drift, Dockerfile base image mismatches, CI matrix drift | `WARNING` |
+| **Architecture** | `IMP-001` - `IMP-004` | Circular import cycles, unresolved local imports, orphan modules, deprecated stdlib modules | `ERROR` / `WARNING` |
+| **Packaging** | `PKG-001` - `PKG-002` | Missing PEP 621 metadata, invalid configuration syntax | `ERROR` / `WARNING` |
+| **FastAPI Doctor** | `FAP-001` - `FAP-038` | Blocking I/O in async routes, missing response models, insecure CORS, untyped request bodies, Pydantic v2 migrations | `ERROR` / `WARNING` |
+| **SQLAlchemy Doctor** | `SQL-001` - `SQL-030` | N+1 queries in loops, unclosed sessions, SQL injection risks, sync DB calls in async event loop, 2.0 mapped columns | `ERROR` / `WARNING` |
 
-👉 *See all 80+ rules and remediation steps in the [Rules Catalog](docs/rules.md).*
+*Refer to the complete [Rules Catalog](docs/rules.md) for full descriptions and remediation guides.*
 
 ---
 
-## 🛠️ CLI Commands & Examples
+## CLI Commands & Usage
 
-### 1. `qv scan` — Full Project Diagnostics
-Run a comprehensive health audit scanning dependencies, runtime environment, imports, and packaging.
+### 1. Diagnostic & Health Scanning (`qv scan`)
 
+Perform comprehensive health scans across dependencies, runtime environment, imports, and framework code.
+
+#### Standard Project Scan
 ```bash
-# Scan current repository
+# Scan current directory
 qv scan
 
 # Scan a specific directory or microservice
 qv scan ./services/payment
+```
 
-# Strict mode: fail CI if any warnings exist (exit code 1)
+**Terminal Output (Healthy Project):**
+```text
+qv
+Project: python-qv
+Python:  3.12.7
+Package Manager: uv
+
+0 Errors   0 Warnings   65 Checks Passed
+
+Everything looks healthy. No diagnostic issues found.
+Health Score: 100/100
+```
+
+**Terminal Output (Project with Findings):**
+```text
+qv
+Project: payment-service
+Python:  3.12.7
+Package Manager: uv
+
+2 Errors   1 Warnings   48 Checks Passed
+
+┌────────────────── [ERROR] DEP-001 Dependency constraint conflict ───────────┐
+│ celery 5.4.0 requires kombu<5.4.0,>=5.3.0, but installed is kombu 5.5.2.     │
+│                                                                              │
+│ Evidence:                                                                    │
+│   - celery declared requirement: kombu<5.4.0,>=5.3.0                         │
+│   - Installed kombu version: 5.5.2 in active environment                     │
+│                                                                              │
+│ Suggested fix:                                                               │
+│   Upgrade celery or pin kombu to <5.4.0,>=5.3.0.                             │
+│   $ uv add 'kombu<5.4.0,>=5.3.0'                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────── [ERROR] DEP-002 Missing dependency declaration ───────────┐
+│ Package 'httpx' is imported in src/client.py but is not in pyproject.toml.   │
+│                                                                              │
+│ Suggested fix:                                                               │
+│   $ uv add httpx                                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────── [WARN] IMP-003 Unused / orphan local module ──────────────┐
+│ File 'src/utils/legacy_calc.py' is never imported by any project module.     │
+│                                                                              │
+│ Suggested fix:                                                               │
+│   Review if this module is obsolete and can be safely deleted.              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Health Score: 65/100
+```
+
+#### Strict Mode & Severity Filtering
+```bash
+# Fail with exit code 1 if any warnings or errors exist
 qv scan --strict
 
-# Generate a self-contained interactive HTML dashboard
-qv scan --html report.html
+# Filter by minimum severity level (error, warning, info)
+qv scan --severity error
 
-# Output SARIF format for GitHub Code Scanning / IDE integration
+# Shorthand flags
+qv scan -E            # --errors-only: display errors only
+qv scan -W            # --hide-warnings: hide warning diagnostics
+```
+
+#### Interactive HTML Dashboard Export
+```bash
+qv scan --html report.html
+```
+
+**Terminal Output:**
+```text
+HTML report successfully written to report.html
+
+qv
+Project: python-qv
+Python:  3.12.7
+Package Manager: uv
+
+0 Errors   0 Warnings   65 Checks Passed
+Health Score: 100/100
+```
+
+#### JSON and SARIF Export (CI / Code Scanning)
+```bash
+# Output SARIF format for GitHub Security Code Scanning tab
 qv scan --sarif -o results.sarif
 
-# Output machine-readable JSON
-qv scan --json -o results.json
-
-# Offline / Airgapped mode (skips remote package index checks)
-qv scan --offline
+# Output machine-readable JSON for custom pipelines
+qv scan --json -o findings.json
 
 # Emit GitHub Actions workflow command annotations (::error:: and ::warning::)
 qv scan --ci --github-annotations
 ```
 
+#### Airgapped / Offline Mode
+```bash
+# Disable remote network queries (e.g. vulnerability feeds and PyPI index checks)
+qv scan --offline
+```
+
 ---
 
-### 2. `qv inspect` (or `qv ui`) — Interactive Terminal Dashboard
-Explore diagnostic findings, view evidence, inspect circular import trees, and apply fixes interactively with keyboard shortcuts.
+### 2. Interactive Terminal Dashboard (`qv inspect` / `qv ui`)
+
+Launch a full-screen interactive TUI to inspect findings, view location traces, inspect circular import trees, and trigger fixes interactively.
 
 ```bash
-# Launch interactive dashboard for current repository
+# Inspect current repository
 qv inspect
 
-# Inspect another project
-qv inspect ../another-service
+# Shorthand alias
+qv ui
 
-# Airgapped / offline TUI
-qv inspect --offline
+# Inspect target project in offline mode
+qv inspect ./services/backend --offline
 ```
-
-*Controls: `↑`/`k` and `↓`/`j` to navigate, `Enter` to expand details, `f` to apply fix, `t` to toggle dependency tree, `q` to quit.*
 
 ---
 
-### 3. `qv fix` — Safe Automated Remediation
-Automatically generate and apply deterministic fixes to your project manifest and configuration.
+### 3. Automated Safe Remediation (`qv fix`)
+
+Safely and automatically apply deterministic configuration and code fixes.
+
+#### Dry-Run Mode
+Preview proposed file modifications and shell commands without writing changes to disk:
 
 ```bash
-# Interactive wizard (prompts before applying each fix)
-qv fix
-
-# Preview proposed file diffs and commands without modifying disk
 qv fix --dry-run
+```
 
-# Automatically apply all safe fixes without prompting
+**Terminal Output:**
+```text
+Found 2 actionable fix(es) (2 safe):
+
+Proposed Fixes
+┌─────────┬────────────────┬───────────────────────────────────────────────────┬──────────────┐
+│ Rule    │ Target         │ Description                                       │ Type         │
+├─────────┼────────────────┼───────────────────────────────────────────────────┼──────────────┤
+│ DEP-002 │ pyproject.toml │ Add missing dependency 'httpx' to pyproject.toml  │ config_patch │
+│ DEP-003 │ pyproject.toml │ Remove unused dependency 'pyyaml'                 │ config_patch │
+└─────────┴────────────────┴───────────────────────────────────────────────────┴──────────────┘
+
+Dry-run mode enabled. No changes written to disk.
+```
+
+#### Applying Fixes
+```bash
+# Apply all safe fixes without interactive confirmation prompts
 qv fix -y
 
-# Fix only a specific rule (e.g. missing dependencies)
+# Fix a specific rule only
 qv fix --rule DEP-002 -y
 
-# Apply fixes and execute package manager sync commands
-qv fix --sync -y
+# Apply fixes and execute package manager sync commands (e.g. uv sync / poetry install)
+qv fix -y --sync
+```
+
+**Terminal Output:**
+```text
+Found 1 actionable fix(es) (1 safe):
+
+Successfully applied 1 fix(es):
+  + Add missing dependency 'httpx' to pyproject.toml
 ```
 
 ---
 
-### 4. `qv tree` (or `qv graph`) — Dependency & Architecture Visualizer
-Render color-coded visual trees of package dependencies and source module import graphs.
+### 4. Dependency & Import Architecture Visualizer (`qv tree` / `qv graph`)
 
+Render structured visual trees of package dependencies and internal source module import architecture.
+
+#### Full Hierarchy Overview
 ```bash
-# Render complete overview (dependency tree + import architecture)
 qv tree
+```
 
-# Visualize direct & transitive dependencies up to depth 2
-qv tree --dependencies --depth 2
-# or shorthand:
-qv tree -d -L 2
+**Terminal Output:**
+```text
+Dependency Hierarchy
+└── fastapi (0.115.0)
+    ├── pydantic (2.9.2)
+    │   └── pydantic-core (2.23.4)
+    ├── starlette (0.38.6)
+    │   └── anyio (4.6.0)
+    └── typing-extensions (4.12.2)
 
-# Visualize internal module import graph and circular import cycles
+Internal Module Import Architecture
+└── app.main
+    ├── app.api.routes
+    │   └── app.core.config
+    └── app.db.session
+        └── app.models.user [CYCLE DETECTED]
+```
+
+#### Targeted Tree Views
+```bash
+# Show internal module imports and circular cycles only
 qv tree --imports
-# or shorthand:
 qv tree -i
 
-# Export tree hierarchy and cycle statistics as JSON
-qv tree --json > tree.json
+# Show direct and transitive package dependencies up to depth 2
+qv tree --dependencies --depth 2
+qv tree -d -L 2
+
+# Export tree statistics and cycle detection as JSON
+qv tree --json
 ```
 
 ---
 
-### 5. `qv explain` — Rule Catalog & Fix Advice
-Look up detailed explanations, common causes, evidence criteria, and remediation advice for any diagnostic rule.
+### 5. Framework-Specific Analyzers (`qv framework`)
 
+Run dedicated analyzers tailored for popular frameworks.
+
+#### FastAPI Analyzer (`FAP-001` - `FAP-038`)
 ```bash
-# Explain dependency constraint conflicts
-qv explain DEP-001
+qv framework --name fastapi
+```
 
-# Explain missing undeclared imports
-qv explain DEP-002
+**Terminal Output:**
+```text
+qv (FastAPI Doctor)
+Project: my-api
+Python:  3.12.7
 
-# Explain circular import loops
-qv explain IMP-001
+1 Errors   1 Warnings   32 Checks Passed
 
-# Explain Python/Docker environment drift
-qv explain ENV-002
+┌────────────────── [ERROR] FAP-001 Blocking call in async endpoint ───────────┐
+│ File 'src/api/users.py:42'                                                   │
+│ Synchronous blocking call 'time.sleep()' inside 'async def get_users()'      │
+│ blocks the asyncio event loop and starves concurrent requests.               │
+│                                                                              │
+│ Suggested fix:                                                               │
+│   Use 'await asyncio.sleep()' or run in threadpool via anyio.to_thread.      │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────── [WARN] FAP-003 Missing response model ─────────────────────┐
+│ Route '@router.get("/items")' in src/api/items.py lacks a response_model.   │
+│                                                                              │
+│ Suggested fix:                                                               │
+│   Add return type annotation: 'async def get_items() -> list[ItemResponse]:' │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### SQLAlchemy Analyzer (`SQL-001` - `SQL-030`)
+```bash
+qv framework --name sqlalchemy
+```
+
+**Terminal Output:**
+```text
+qv (SQLAlchemy Doctor)
+Project: my-api
+
+1 Errors   0 Warnings   28 Checks Passed
+
+┌────────────────── [ERROR] SQL-004 SQL Injection Risk ─────────────────────────┐
+│ File 'src/db/repositories/user.py:28'                                        │
+│ Raw SQL f-string interpolation detected: text(f"SELECT * FROM users WHERE id={uid}")│
+│                                                                              │
+│ Suggested fix:                                                               │
+│   Use bound query parameters: text("SELECT * FROM users WHERE id = :uid")    │
+│   session.execute(stmt, {"uid": uid})                                        │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ### 6. Subsystem-Focused Scans
-Run focused audits on specific components when troubleshooting or in modular CI pipelines:
+
+Run targeted audits on specific components:
 
 ```bash
-# Check dependencies only (conflicts, missing, unused, incompatible Python)
+# Check dependencies only (conflicts, missing, unused, Python version compat, CVEs)
 qv dependency
 
-# Check environment drift only (interpreter version, Dockerfile, CI matrix)
+# Check environment drift only (Python interpreter, Docker base images, CI matrix)
 qv environment
 
-# Check AST & imports only (circular import loops, unresolvable modules)
+# Check AST & imports only (circular import loops, unresolvable modules, orphan files)
 qv architecture
-
-# Check framework-specific issues (FastAPI, SQLAlchemy, SQLModel)
-qv framework
-qv framework --name fastapi
-qv framework --name sqlalchemy
 ```
 
 ---
 
-### 7. `qv init` — Project Configuration Setup
-Initialize or update `pyproject.toml` with default `[tool.qv]` configuration rules and path exclusions without overwriting existing settings.
+### 7. Rule Explanation & Catalog Lookup (`qv explain`)
+
+Lookup rule definitions, remediation strategies, and documentation for any diagnostic code:
 
 ```bash
-# Initialize [tool.qv] in pyproject.toml
+qv explain FAP-001
+```
+
+**Terminal Output:**
+```text
+┌────────────────── FAP-001 - Blocking call in async endpoint ─────────────────┐
+│ Category: Framework                                                          │
+│ Default Severity: ERROR                                                      │
+│                                                                              │
+│ Description:                                                                 │
+│ Synchronous blocking operations (e.g. time.sleep, requests, subprocess) or    │
+│ CPU-bound hashing called inside an async def FastAPI route handler block the │
+│ asyncio event loop.                                                          │
+│                                                                              │
+│ Remediation Recommendation:                                                  │
+│ Use non-blocking async alternatives (e.g. asyncio.sleep, httpx.AsyncClient)  │
+│ or run blocking/CPU calls in worker threads via anyio.to_thread.run_sync.    │
+│                                                                              │
+│ Documentation:                                                               │
+│ https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-001                │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 8. Project Initialization (`qv init`)
+
+Initialize or append default `[tool.qv]` settings to `pyproject.toml` without modifying other configuration tables:
+
+```bash
 qv init
 ```
 
 ---
 
-### 8. `qv version` — Version Information
+### 9. Version & Info (`qv version`)
+
 ```bash
 qv version
-# or
-qv --version
 ```
-
-👉 *See full option matrices in the [CLI Reference](docs/cli_reference.md).*
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
-Configure `qv` in your `pyproject.toml`:
+Configure `qv` directly in `pyproject.toml`:
 
 ```toml
 [tool.qv]
 
-# Override severity for any rule (error, warning, info, off)
+# Override rule severities (error, warning, info, off)
 [tool.qv.rules]
 DEP-001 = "error"
 DEP-003 = "warning"
@@ -354,15 +532,15 @@ exclude = [
 python = "3.12"
 ```
 
-👉 *Learn more in the [Configuration Guide](docs/configuration.md).*
+*Learn more in the [Configuration Guide](docs/configuration.md).*
 
 ---
 
-## 🤖 CI/CD Integration
+## CI/CD Integration
 
 ### Official GitHub Action
 
-You can use the official `qv` GitHub Action directly in `.github/workflows/ci.yml`:
+Integrate `qv` directly into `.github/workflows/ci.yml`:
 
 ```yaml
 name: Health & Dependency Scan
@@ -415,46 +593,43 @@ jobs:
 
 ### Pre-commit Hook Integration
 
-Add `qv` directly to your `.pre-commit-config.yaml` to catch dependency drift and circular imports before committing:
+Add `qv` to `.pre-commit-config.yaml` to detect dependency drift and circular imports prior to commits:
 
 ```yaml
 repos:
   - repo: https://github.com/inzamol/qv
     rev: v0.1.0
     hooks:
-      # Diagnose health before committing
       - id: qv-scan
         args: [--strict, --offline]
-
-      # Optional: Auto-remediate safe issues on commit
-      # - id: qv-fix
 ```
 
-👉 *See full details in [CI/CD & Pre-commit Integration](docs/ci_integration.md).*
+*See full details in [CI/CD & Pre-commit Integration](docs/ci_integration.md).*
 
 ---
 
-## 🎯 Design Principles
+## Design Principles
 
 - **Diagnose first. Explain second. Fix safely.**
-- **No destructive auto-mutations**: Remediations provide the exact commands/diffs for you to review and apply.
-- **Local-first & Blazing fast**: Zero network calls required; scans complete in under a second.
-- **Package-manager agnostic**: Works out of the box with `uv`, Poetry, `pip`, PDM, and Pipenv.
+- **Deterministic and safe**: Auto-remediations offer exact diffs and non-destructive configuration updates.
+- **Local-first and fast**: Full AST parsing, dependency graph resolution, and checks complete in under a second.
+- **Package-manager agnostic**: Works with `uv`, Poetry, `pip`, PDM, and Pipenv.
 
 ---
 
-## 📚 Complete Documentation
-Online documentation is available at **[inzamol.github.io/qv](https://inzamol.github.io/qv/)**.
+## Documentation
 
-- 🚀 [Getting Started Guide](https://inzamol.github.io/qv/getting_started/)
-- 📖 [CLI Reference](https://inzamol.github.io/qv/cli_reference/)
-- 📋 [Diagnostic Rules Catalog](https://inzamol.github.io/qv/rules/)
-- ⚙️ [Configuration Guide](https://inzamol.github.io/qv/configuration/)
-- 🤖 [CI/CD & SARIF Integration](https://inzamol.github.io/qv/ci_integration/)
-- 🤝 [Contributing Guidelines](https://inzamol.github.io/qv/contributing/)
+Full documentation is available at **[inzamol.github.io/qv](https://inzamol.github.io/qv/)**.
+
+- [Getting Started Guide](https://inzamol.github.io/qv/getting_started/)
+- [CLI Reference](https://inzamol.github.io/qv/cli_reference/)
+- [Diagnostic Rules Catalog](https://inzamol.github.io/qv/rules/)
+- [Configuration Guide](https://inzamol.github.io/qv/configuration/)
+- [CI/CD & SARIF Integration](https://inzamol.github.io/qv/ci_integration/)
+- [Contributing Guidelines](https://inzamol.github.io/qv/contributing/)
 
 ---
 
-## 📄 License
+## License
 
 Distributed under the [MIT License](LICENSE).
