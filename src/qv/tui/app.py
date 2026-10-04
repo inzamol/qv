@@ -179,12 +179,10 @@ class TuiExplorer:
 
         # Main view
         if self.show_tree:
-            from qv.core.config import QvConfig
-            from qv.core.project import ProjectDiscovery
+            from qv.core.project import load_project
 
-            discovery = ProjectDiscovery(root=Path(self.result.project_path), config=QvConfig())
-            context = discovery.discover_context()
-            tree = TreeVisualizer(context=context).build_dependency_tree()
+            project = load_project(self.result.project_path)
+            tree = TreeVisualizer(context=project.context).build_dependency_tree()
             layout["main"].update(
                 Panel(tree, title="Dependency Tree (Press 't' to toggle)", border_style="blue")
             )

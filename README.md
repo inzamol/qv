@@ -209,6 +209,20 @@ Package Manager: uv
 │   $ uv add httpx                                                             │
 └──────────────────────────────────────────────────────────────────────────────┘
 
+┌────────────────── [WARN] DEP-002 Undeclared transitive dependency: kombu ────┐
+│ Module 'kombu' is imported in src/tasks.py:3 and provided transitively        │
+│ by 'celery', but is not declared directly in project dependencies.           │
+│                                                                              │
+│ Evidence:                                                                    │
+│   - Import statement: `import kombu` in src/tasks.py:3                       │
+│   - 'kombu' is currently installed as a transitive dependency via 'celery',  │
+│     but is not declared directly.                                            │
+│                                                                              │
+│ Suggested fix:                                                               │
+│   Add 'kombu' directly to project dependencies in pyproject.toml.            │
+│   $ uv add kombu                                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
 ┌────────────────── [WARN] IMP-003 Unused / orphan local module ──────────────┐
 │ File 'src/utils/legacy_calc.py' is never imported by any project module.     │
 │                                                                              │
@@ -216,7 +230,7 @@ Package Manager: uv
 │   Review if this module is obsolete and can be safely deleted.              │
 └──────────────────────────────────────────────────────────────────────────────┘
 
-Health Score: 65/100
+Health Score: 60/100
 ```
 
 #### Strict Mode & Severity Filtering
@@ -503,31 +517,41 @@ qv version
 
 ## Configuration
 
-Configure `qv` directly in `pyproject.toml`:
+Configure `qv` directly in `pyproject.toml` to customize severities, ignore rules, or disable specific checks:
 
 ```toml
 [tool.qv]
+# Global scan settings
+offline = false          # Set true to disable remote CVE/PyPI network queries
+hide_warnings = false    # Set true to suppress warning-level diagnostics
+errors_only = false      # Set true to report only blocking errors
+min_severity = "warning" # Minimum threshold: "error", "warning", or "info"
 
-# Override rule severities (error, warning, info, off)
+# Method 1: Turn off specific rules or override severity ("off", "error", "warning", "info")
 [tool.qv.rules]
-DEP-001 = "error"
-DEP-003 = "warning"
-ENV-002 = "info"
+DEP-002 = "off"          # Disable missing/transitive dependency check
+IMP-003 = "off"          # Disable orphan module check
+DEP-001 = "error"        # Treat dependency conflicts as blocking errors
+ENV-002 = "info"         # Demote Docker runtime drift to informational notice
 
-# Ignore specific rules
+# Method 2: Ignore list for rules
 [tool.qv.ignore]
-rules = ["DEP-004"]
+rules = [
+    "DEP-004",           # Ignore Python version compatibility mismatch
+    "FAP-031",           # Ignore typing.Annotated styling rule
+]
 
-# Exclude directories from scanning
+# Exclude directories and files from scanning
 [tool.qv.paths]
 exclude = [
     ".venv",
     "build",
     "dist",
     "legacy_scripts",
+    "tests/fixtures",
 ]
 
-# Set expected target Python version
+# Set expected target Python runtime
 [tool.qv.runtime]
 python = "3.12"
 ```
