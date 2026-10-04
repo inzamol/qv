@@ -17,3 +17,10 @@ def test_get_rule_definition_case_insensitive():
     assert rule is not None
     assert rule.id == "DEP-001"
     assert rule.category == "dependency"
+
+
+def test_dep_003_rule_definition():
+    rule = get_rule_definition("DEP-003")
+    assert rule is not None
+    assert rule.title == "No direct import detected"
+    assert "no direct imports were detected" in rule.description

@@ -141,6 +141,9 @@ def test_dep_003_unused_dependency(tmp_path: Path):
     unused_diags = [d for d in diagnostics if d.id == "DEP-003"]
     assert len(unused_diags) == 1
     assert "httpx" in unused_diags[0].affected_packages
+    assert unused_diags[0].title == "No direct import detected: httpx"
+    assert "no direct import was detected" in unused_diags[0].message
+    assert any(e.source == "AST Import Analysis" for e in unused_diags[0].evidence)
 
 
 def test_dep_002_known_package_mappings_and_build_tools(tmp_path: Path):

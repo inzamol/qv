@@ -72,7 +72,7 @@ class RemediationEngine:
                         )
                     )
 
-            # Handle DEP-003: Unused declared dependency
+            # Handle DEP-003: No direct import detected
             elif diag.id == "DEP-003":
                 pkg = diag.metadata.get("unused_package")
                 if not pkg and diag.affected_packages:
@@ -91,7 +91,7 @@ class RemediationEngine:
                             id=f"fix-dep-003-{idx}-{pkg}",
                             rule_id="DEP-003",
                             action_type=FixActionType.REMOVE_DEPENDENCY,
-                            description=f"Remove unused dependency '{pkg}' from {target_file}",
+                            description=f"Remove unimported dependency '{pkg}' from {target_file}",
                             target_file=target_file,
                             diff=f"- {pkg}",
                             metadata={"package": pkg},

@@ -44,11 +44,11 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
     "DEP-003": RuleDefinition(
         id="DEP-003",
         category="dependency",
-        title="Unused declared dependency",
-        description="A package is declared as a direct dependency but no imports were detected across project source files.",
+        title="No direct import detected",
+        description="A package is declared as a direct dependency, but no direct imports were detected across project source files.",
         default_severity=Severity.WARNING,
-        remediation_hint="Verify if this dependency is needed at runtime or remove it to keep dependencies lean.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-003--unused-declared-dependency",
+        remediation_hint="Verify if this dependency is used dynamically, required as a plugin/driver, or can be safely removed.",
+        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-003--no-direct-import-detected",
     ),
     "DEP-004": RuleDefinition(
         id="DEP-004",
