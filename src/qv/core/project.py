@@ -71,6 +71,14 @@ class ProjectDiscovery:
         self.root = root.resolve()
         self.config = config or QvConfig.from_pyproject(self.root / "pyproject.toml")
 
+    def _is_within_boundary(self, path: Path) -> bool:
+        """Check if path securely resides within the project root boundary without escaping via external symlinks."""
+        try:
+            resolved = path.resolve()
+            return resolved.is_relative_to(self.root)
+        except (ValueError, RuntimeError, OSError):
+            return False
+
     def discover_context(self) -> ProjectContext:
         """Build and return an immutable ProjectContext."""
         pyproject_path = self.root / "pyproject.toml"
@@ -82,23 +90,27 @@ class ProjectDiscovery:
         # 1. Package manager detection & manifest parsing
         package_manager = "pip"
 
-        if (self.root / "uv.lock").exists():
+        if (self.root / "uv.lock").exists() and self._is_within_boundary(self.root / "uv.lock"):
             package_manager = "uv"
             lock_files.append(self.root / "uv.lock")
-        elif (self.root / "poetry.lock").exists():
+        elif (self.root / "poetry.lock").exists() and self._is_within_boundary(
+            self.root / "poetry.lock"
+        ):
             package_manager = "poetry"
             lock_files.append(self.root / "poetry.lock")
-        elif (self.root / "pdm.lock").exists():
+        elif (self.root / "pdm.lock").exists() and self._is_within_boundary(self.root / "pdm.lock"):
             package_manager = "pdm"
             lock_files.append(self.root / "pdm.lock")
-        elif (self.root / "Pipfile.lock").exists():
+        elif (self.root / "Pipfile.lock").exists() and self._is_within_boundary(
+            self.root / "Pipfile.lock"
+        ):
             package_manager = "pipenv"
             lock_files.append(self.root / "Pipfile.lock")
 
         target_python = self.config.target_python
 
         # Check pyproject.toml
-        if pyproject_path.exists():
+        if pyproject_path.exists() and self._is_within_boundary(pyproject_path):
             manifest_files.append(pyproject_path)
             try:
                 with open(pyproject_path, "rb") as f:
@@ -276,7 +288,11 @@ class ProjectDiscovery:
 
         # Check setup.cfg
         setup_cfg_path = self.root / "setup.cfg"
-        if setup_cfg_path.exists() and setup_cfg_path.is_file():
+        if (
+            setup_cfg_path.exists()
+            and setup_cfg_path.is_file()
+            and self._is_within_boundary(setup_cfg_path)
+        ):
             manifest_files.append(setup_cfg_path)
             try:
                 cfg = configparser.ConfigParser()
@@ -321,7 +337,11 @@ class ProjectDiscovery:
 
         # Check setup.py
         setup_py_path = self.root / "setup.py"
-        if setup_py_path.exists() and setup_py_path.is_file():
+        if (
+            setup_py_path.exists()
+            and setup_py_path.is_file()
+            and self._is_within_boundary(setup_py_path)
+        ):
             if setup_py_path not in manifest_files:
                 manifest_files.append(setup_py_path)
             try:
@@ -382,7 +402,11 @@ class ProjectDiscovery:
 
         # Check Pipfile
         pipfile_path = self.root / "Pipfile"
-        if pipfile_path.exists() and pipfile_path.is_file():
+        if (
+            pipfile_path.exists()
+            and pipfile_path.is_file()
+            and self._is_within_boundary(pipfile_path)
+        ):
             if pipfile_path not in manifest_files:
                 manifest_files.append(pipfile_path)
             try:
@@ -438,14 +462,16 @@ class ProjectDiscovery:
             "constraints.txt",
         ):
             for p in self.root.glob(pat):
-                discovered_req_files.add(p)
+                if self._is_within_boundary(p):
+                    discovered_req_files.add(p)
 
         for req_dir_name in ("requirements", "reqs", "deps", "requirements.d"):
             req_dir = self.root / req_dir_name
-            if req_dir.is_dir():
+            if req_dir.is_dir() and self._is_within_boundary(req_dir):
                 for ext in ("*.txt", "*.in", "*.pip"):
                     for p in req_dir.rglob(ext):
-                        discovered_req_files.add(p)
+                        if self._is_within_boundary(p):
+                            discovered_req_files.add(p)
 
         for req_path in sorted(discovered_req_files):
             if req_path.is_file():
@@ -527,7 +553,7 @@ class ProjectDiscovery:
         project_site_packages: list[str] = []
         for venv_name in (".venv", "venv", "env", ".env"):
             venv_dir = self.root / venv_name
-            if venv_dir.is_dir():
+            if venv_dir.is_dir() and self._is_within_boundary(venv_dir):
                 win_sp = venv_dir / "Lib" / "site-packages"
                 if win_sp.is_dir():
                     project_site_packages.append(str(win_sp))
@@ -564,6 +590,9 @@ class ProjectDiscovery:
 
         exclude_patterns = set(self.config.paths.exclude)
         for py_path in self.root.rglob("*.py"):
+            if not self._is_within_boundary(py_path):
+                continue
+
             rel_path = py_path.relative_to(self.root)
             # Check exclusions
             parts = rel_path.parts
@@ -675,7 +704,7 @@ class ProjectDiscovery:
 
     def _discover_docker(self) -> DockerConfig:
         dockerfile = self.root / "Dockerfile"
-        if not dockerfile.exists():
+        if not dockerfile.exists() or not self._is_within_boundary(dockerfile):
             return DockerConfig(has_dockerfile=False)
 
         base_image = None
@@ -703,11 +732,17 @@ class ProjectDiscovery:
         workflow_files: list[Path] = []
         matrix_versions: list[str] = []
 
-        if gh_workflows.exists() and gh_workflows.is_dir():
+        if (
+            gh_workflows.exists()
+            and gh_workflows.is_dir()
+            and self._is_within_boundary(gh_workflows)
+        ):
             for f in gh_workflows.glob("*.yml"):
-                workflow_files.append(f)
+                if self._is_within_boundary(f):
+                    workflow_files.append(f)
             for f in gh_workflows.glob("*.yaml"):
-                workflow_files.append(f)
+                if self._is_within_boundary(f):
+                    workflow_files.append(f)
 
             # Look for python-version in workflow files
             for wf in workflow_files:
