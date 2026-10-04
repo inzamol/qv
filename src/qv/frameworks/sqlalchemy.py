@@ -6,7 +6,7 @@ import ast
 import re
 
 from qv.core.context import ProjectContext
-from qv.core.models import Diagnostic, Evidence, Severity, Suggestion
+from qv.core.models import AnalyzerStatus, Diagnostic, Evidence, Severity, Suggestion
 from qv.frameworks.base import FrameworkPlugin
 from qv.rules.registry import get_rule_definition
 
@@ -40,6 +40,10 @@ class SqlAlchemyAnalyzer(FrameworkPlugin):
         "Detects N+1 query patterns, session lifecycle leaks, async blocking DB calls, "
         "SQL injection vulnerabilities, connection pool risks, schema integrity flaws, and modern 2.0 syntax."
     )
+    rules: tuple[str, ...] = tuple(f"SQL-{i:03d}" for i in range(1, 31))
+
+    def __init__(self) -> None:
+        self.status: AnalyzerStatus = AnalyzerStatus.OK
 
     def detect(self, context: ProjectContext) -> bool:
         """Detect if SQLAlchemy or SQL-related libraries are present in the project."""
@@ -61,7 +65,10 @@ class SqlAlchemyAnalyzer(FrameworkPlugin):
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         """Analyze project source files for SQL and SQLAlchemy diagnostics."""
         if not self.detect(context):
+            self.status = AnalyzerStatus.SKIPPED
             return []
+
+        self.status = AnalyzerStatus.OK
 
         diagnostics: list[Diagnostic] = []
         has_sqlalchemy_models = False
@@ -1206,7 +1213,7 @@ class SqlAlchemyAnalyzer(FrameworkPlugin):
         return diagnostics
 
     def _check_models_and_schema(self, tree: ast.AST, file_path: str) -> list[Diagnostic]:
-        """Check for SQL-012, SQL-017, SQL-020, SQL-022, SQL-023, SQL-029."""
+        """Check for SQL-006, SQL-012, SQL-017, SQL-020, SQL-022, SQL-023, SQL-029."""
         diagnostics: list[Diagnostic] = []
 
         for node in ast.walk(tree):
@@ -1408,8 +1415,65 @@ class SqlAlchemyAnalyzer(FrameworkPlugin):
                                     )
                                 )
 
+                    # SQL-006: Missing relationship eager loading strategy
                     # SQL-012: Relationship cascade delete
                     if call_tup[-1] == "relationship":
+                        lazy_kw = next((kw for kw in call_node.keywords if kw.arg == "lazy"), None)
+                        has_eager_lazy = False
+                        if lazy_kw is not None:
+                            if isinstance(lazy_kw.value, ast.Constant):
+                                if isinstance(lazy_kw.value.value, str):
+                                    if lazy_kw.value.value in (
+                                        "selectin",
+                                        "joined",
+                                        "subquery",
+                                        "raise",
+                                        "raise_on_sql",
+                                        "noload",
+                                        "write_only",
+                                        "dynamic",
+                                        "immediate",
+                                    ):
+                                        has_eager_lazy = True
+                                elif lazy_kw.value.value is False:
+                                    has_eager_lazy = True
+
+                        if not has_eager_lazy:
+                            rule_def = get_rule_definition("SQL-006")
+                            doc_url = (
+                                rule_def.doc_url
+                                if rule_def
+                                else "https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-006"
+                            )
+                            diagnostics.append(
+                                Diagnostic(
+                                    id="SQL-006",
+                                    severity=Severity.WARNING,
+                                    category="framework",
+                                    title="Missing relationship eager loading strategy in async session",
+                                    message=(
+                                        f"Relationship on line {call_lineno} defined without explicit eager loading strategy "
+                                        f"(e.g., lazy='selectin' or lazy='joined'). Accessing it in async sessions may cause MissingGreenlet errors."
+                                    ),
+                                    evidence=[
+                                        Evidence(
+                                            fact=f"relationship() defined without explicit eager loading strategy on line {call_lineno}.",
+                                            source=file_path,
+                                        )
+                                    ],
+                                    suggestions=[
+                                        Suggestion(
+                                            description="Specify 'lazy=\"selectin\"' or 'lazy=\"joined\"' on the relationship definition.",
+                                            code_snippet="items = relationship('Item', lazy='selectin')",
+                                        )
+                                    ],
+                                    file=file_path,
+                                    line=call_lineno,
+                                    column=getattr(call_node, "col_offset", None),
+                                    doc_url=doc_url,
+                                )
+                            )
+
                         for kw in call_node.keywords:
                             if (
                                 kw.arg == "cascade"

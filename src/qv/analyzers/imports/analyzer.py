@@ -86,6 +86,12 @@ class ImportAnalyzer:
     description = (
         "Detects circular imports, unresolved internal modules, dead code, and deprecated stdlibs."
     )
+    rules: tuple[str, ...] = (
+        "IMP-001",
+        "IMP-002",
+        "IMP-003",
+        "IMP-004",
+    )
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []

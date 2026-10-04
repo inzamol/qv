@@ -21,6 +21,7 @@ class CrashingAnalyzer(Analyzer):
     id: str = "CRASH-001"
     name: str = "CrashingAnalyzer"
     description: str = "Simulates analyzer failures for testing"
+    rules: tuple[str, ...] = ("CRASH-001",)
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         raise RuntimeError("Simulated internal analyzer crash in parsing AST")
@@ -32,6 +33,7 @@ class HealthyAnalyzer(Analyzer):
     id: str = "HEALTHY-001"
     name: str = "HealthyAnalyzer"
     description: str = "Simulates healthy analyzer execution for testing"
+    rules: tuple[str, ...] = ("DEP-003", "DEP-004")
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         return [
@@ -156,3 +158,131 @@ dependencies = []
     assert result.exit_code == 1
     assert "ENG-001" in result.output
     assert "CrashingAnalyzer" in result.output
+
+
+def test_reported_check_counts_reflect_actual_analysis(tmp_path: Path):
+    """Test that checks_passed reflects actual evaluated rules minus failed rules."""
+    context = create_sample_context(tmp_path)
+
+    # HealthyAnalyzer evaluates ("DEP-003", "DEP-004") and emits finding for DEP-003
+    engine = AnalysisEngine(
+        config=QvConfig(),
+        analyzers=[HealthyAnalyzer()],
+    )
+    result = engine.run(context)
+
+    # Evaluated rules: DEP-003, DEP-004 (2 rules)
+    # Failed rules: DEP-003 (1 rule)
+    # Checks passed: DEP-004 (1 check)
+    assert result.summary.checks_passed == 1
+    assert result.summary.warnings_count == 1
+    assert result.summary.errors_count == 0
+
+
+def test_reported_check_counts_with_disabled_rule(tmp_path: Path):
+    """Test that disabled rules are excluded from evaluated and passed counts."""
+    context = create_sample_context(tmp_path)
+
+    config = QvConfig(ignored_rules={"DEP-003"})
+    engine = AnalysisEngine(
+        config=config,
+        analyzers=[HealthyAnalyzer()],
+    )
+    result = engine.run(context)
+
+    # Evaluated rules: DEP-004 (1 rule, since DEP-003 is ignored)
+    # Failed rules: 0 (DEP-003 finding was filtered out)
+    # Checks passed: DEP-004 (1 check)
+    assert result.summary.checks_passed == 1
+    assert result.summary.warnings_count == 0
+
+
+def test_reported_check_counts_across_multiple_analyzers(tmp_path: Path):
+    """Test that passed check counts dynamically change when analyzers are added or removed."""
+    from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
+    from qv.analyzers.packaging.analyzer import PackagingAnalyzer
+
+    context = create_sample_context(tmp_path)
+
+    # PackagingAnalyzer (PKG-001, PKG-002) = 2 rules
+    # On empty context without pyproject.toml, PKG analyzer returns 0 diagnostics -> 2 passed
+    pkg_engine = AnalysisEngine(
+        config=QvConfig(),
+        analyzers=[PackagingAnalyzer()],
+    )
+    pkg_res = pkg_engine.run(context)
+    assert pkg_res.summary.checks_passed == 2
+
+    # DependencyAnalyzer (DEP-001, DEP-002, DEP-003, DEP-004, DEP-005) = 5 rules
+    # Both analyzers together = 7 rules
+    combined_engine = AnalysisEngine(
+        config=QvConfig(),
+        analyzers=[PackagingAnalyzer(), DependencyAnalyzer()],
+    )
+    combined_res = combined_engine.run(context)
+    assert combined_res.summary.checks_passed == 7
+
+
+def test_reported_check_counts_with_unknown_status_analyzer(tmp_path: Path):
+    """Test that analyzers with UNKNOWN status (e.g. unreachable API) do not report declared rules as passed."""
+    from unittest.mock import MagicMock
+
+    from qv.analyzers.security.analyzer import SecurityAnalyzer
+    from qv.analyzers.security.osv_client import OsvClient, OsvUnavailableError
+    from qv.core.context import InstalledDistribution
+
+    # Context with an installed package
+    context = ProjectContext(
+        project_root=tmp_path,
+        project_name="security-test",
+        python_runtime=PythonRuntime("3.12.0", 3, 12, 0),
+        package_manager="uv",
+        manifest_files=(),
+        lock_files=(),
+        dependencies=(),
+        installed_packages={
+            "requests": InstalledDistribution(
+                name="requests",
+                version="2.31.0",
+                requires=(),
+            )
+        },
+        source_files=(),
+        imports=(),
+        docker=DockerConfig(has_dockerfile=False),
+        ci=CIConfig(has_ci=False),
+    )
+
+    # Mock OSV client raising OsvUnavailableError
+    mock_osv = MagicMock(spec=OsvClient)
+    mock_osv.query_packages.side_effect = OsvUnavailableError("Network unreachable")
+
+    analyzer = SecurityAnalyzer(osv_client=mock_osv)
+    engine = AnalysisEngine(config=QvConfig(), analyzers=[analyzer])
+    result = engine.run(context)
+
+    # SecurityAnalyzer emitted SEC-001 warning and status is UNKNOWN
+    # DEP-006 must NOT be counted as a passed check
+    assert result.summary.warnings_count == 1
+    assert result.summary.checks_passed == 0
+    assert any(d.id == "SEC-001" for d in result.diagnostics)
+
+
+def test_reported_check_counts_with_filtered_warnings(tmp_path: Path):
+    """Test that hiding warnings removes them from display but still counts them as failed rules."""
+    context = create_sample_context(tmp_path)
+
+    # HealthyAnalyzer evaluates ("DEP-003", "DEP-004") and emits a warning finding for DEP-003
+    config = QvConfig(hide_warnings=True)
+    engine = AnalysisEngine(
+        config=config,
+        analyzers=[HealthyAnalyzer()],
+    )
+    result = engine.run(context)
+
+    # Displayed diagnostics should filter out the warning
+    assert len(result.diagnostics) == 0
+    assert result.summary.warnings_count == 0
+
+    # Checks passed must still only be 1 (DEP-004), since DEP-003 failed during analysis
+    assert result.summary.checks_passed == 1

@@ -203,6 +203,13 @@ class DependencyAnalyzer:
     description = (
         "Checks for dependency conflicts, missing imports, unused packages, and version mismatches."
     )
+    rules: tuple[str, ...] = (
+        "DEP-001",
+        "DEP-002",
+        "DEP-003",
+        "DEP-004",
+        "DEP-005",
+    )
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
@@ -211,6 +218,7 @@ class DependencyAnalyzer:
         diagnostics.extend(self._check_installed_conflicts(context))
         diagnostics.extend(self._check_missing_dependencies(context))
         diagnostics.extend(self._check_unused_dependencies(context))
+        diagnostics.extend(self._check_python_compatibility(context))
         diagnostics.extend(self._check_declaration_mismatch(context))
 
         return diagnostics
@@ -504,6 +512,55 @@ class DependencyAnalyzer:
                     doc_url=rule.doc_url,
                 )
                 diagnostics.append(diag)
+
+        return diagnostics
+
+    def _check_python_compatibility(self, context: ProjectContext) -> list[Diagnostic]:
+        """DEP-004: Check if any package has a Requires-Python constraint incompatible with project Python runtime."""
+        diagnostics: list[Diagnostic] = []
+        rule = get_rule_definition("DEP-004")
+        if not rule or not context.installed_packages:
+            return diagnostics
+
+        try:
+            runtime_ver = Version(context.python_runtime.version_str)
+        except Exception:
+            return diagnostics
+
+        for dist in context.installed_packages.values():
+            if not dist.requires_python:
+                continue
+            try:
+                pkg_spec = SpecifierSet(dist.requires_python)
+                if not pkg_spec.contains(runtime_ver, prereleases=True):
+                    diag = Diagnostic(
+                        id=rule.id,
+                        severity=rule.default_severity,
+                        category=rule.category,
+                        title=f"Python compatibility mismatch for {dist.name}",
+                        message=f"Package '{dist.name}' requires Python '{dist.requires_python}', which is incompatible with active Python {context.python_runtime.version_str}.",
+                        evidence=[
+                            Evidence(
+                                fact=f"Package {dist.name} requires Python {dist.requires_python}",
+                                source=f"{dist.name} metadata",
+                            ),
+                            Evidence(
+                                fact=f"Active Python runtime: {context.python_runtime.version_str}",
+                                source="Active Runtime",
+                            ),
+                        ],
+                        suggestions=[
+                            Suggestion(
+                                description=f"Update Python environment to satisfy '{dist.requires_python}' or install a version of '{dist.name}' compatible with Python {context.python_runtime.version_str}.",
+                                is_safe=False,
+                            )
+                        ],
+                        affected_packages=[dist.name],
+                        doc_url=rule.doc_url,
+                    )
+                    diagnostics.append(diag)
+            except Exception:
+                pass
 
         return diagnostics
 

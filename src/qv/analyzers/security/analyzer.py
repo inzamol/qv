@@ -17,6 +17,7 @@ class SecurityAnalyzer:
     description = (
         "Audits lockfiles and dependencies against OSV.dev advisory database for known CVEs."
     )
+    rules: tuple[str, ...] = ("DEP-006",)
 
     def __init__(self, osv_client: OsvClient | None = None) -> None:
         self.osv_client = osv_client or OsvClient()

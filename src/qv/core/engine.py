@@ -127,8 +127,27 @@ class AnalysisEngine:
         # Correlate root causes
         root_causes = self._correlate_root_causes(filtered_diagnostics)
 
-        # Calculate passed checks approximation
-        passed_count = max(0, 30 + checks_evaluated * 5 - len(filtered_diagnostics))
+        # Calculate passed checks based on actual rule execution
+        evaluated_rules: set[str] = set()
+        for analyzer, ar in zip(self.analyzers, analyzer_results, strict=False):
+            if ar.status != AnalyzerStatus.OK:
+                continue
+            analyzer_rules = getattr(analyzer, "rules", ())
+            for r_id in analyzer_rules:
+                if self.config.is_rule_enabled(r_id):
+                    evaluated_rules.add(r_id)
+
+        # Include any dynamic/custom findings enabled in config
+        for diag in raw_diagnostics:
+            if diag.id != "ENG-001" and self.config.is_rule_enabled(diag.id):
+                evaluated_rules.add(diag.id)
+
+        failed_rules = {
+            diag.id
+            for diag in raw_diagnostics
+            if diag.id != "ENG-001" and self.config.is_rule_enabled(diag.id)
+        }
+        passed_count = max(0, len(evaluated_rules - failed_rules))
 
         return ScanResult.create(
             project_name=context.project_name,

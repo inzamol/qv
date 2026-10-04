@@ -22,6 +22,7 @@ class PackagingAnalyzer:
     description = (
         "Checks pyproject.toml and project metadata for PEP 621 compliance and completeness."
     )
+    rules: tuple[str, ...] = ("PKG-001", "PKG-002")
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
