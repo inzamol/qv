@@ -130,7 +130,7 @@ class AnalysisEngine:
         # Calculate passed checks based on actual rule execution
         evaluated_rules: set[str] = set()
         for analyzer, ar in zip(self.analyzers, analyzer_results, strict=False):
-            if ar.status in (AnalyzerStatus.FAILED, AnalyzerStatus.SKIPPED):
+            if ar.status != AnalyzerStatus.OK:
                 continue
             analyzer_rules = getattr(analyzer, "rules", ())
             for r_id in analyzer_rules:
@@ -142,7 +142,11 @@ class AnalysisEngine:
             if diag.id != "ENG-001" and self.config.is_rule_enabled(diag.id):
                 evaluated_rules.add(diag.id)
 
-        failed_rules = {diag.id for diag in filtered_diagnostics if diag.id != "ENG-001"}
+        failed_rules = {
+            diag.id
+            for diag in raw_diagnostics
+            if diag.id != "ENG-001" and self.config.is_rule_enabled(diag.id)
+        }
         passed_count = max(0, len(evaluated_rules - failed_rules))
 
         return ScanResult.create(

@@ -1213,7 +1213,7 @@ class SqlAlchemyAnalyzer(FrameworkPlugin):
         return diagnostics
 
     def _check_models_and_schema(self, tree: ast.AST, file_path: str) -> list[Diagnostic]:
-        """Check for SQL-012, SQL-017, SQL-020, SQL-022, SQL-023, SQL-029."""
+        """Check for SQL-006, SQL-012, SQL-017, SQL-020, SQL-022, SQL-023, SQL-029."""
         diagnostics: list[Diagnostic] = []
 
         for node in ast.walk(tree):
@@ -1415,8 +1415,65 @@ class SqlAlchemyAnalyzer(FrameworkPlugin):
                                     )
                                 )
 
+                    # SQL-006: Missing relationship eager loading strategy
                     # SQL-012: Relationship cascade delete
                     if call_tup[-1] == "relationship":
+                        lazy_kw = next((kw for kw in call_node.keywords if kw.arg == "lazy"), None)
+                        has_eager_lazy = False
+                        if lazy_kw is not None:
+                            if isinstance(lazy_kw.value, ast.Constant):
+                                if isinstance(lazy_kw.value.value, str):
+                                    if lazy_kw.value.value in (
+                                        "selectin",
+                                        "joined",
+                                        "subquery",
+                                        "raise",
+                                        "raise_on_sql",
+                                        "noload",
+                                        "write_only",
+                                        "dynamic",
+                                        "immediate",
+                                    ):
+                                        has_eager_lazy = True
+                                elif lazy_kw.value.value is False:
+                                    has_eager_lazy = True
+
+                        if not has_eager_lazy:
+                            rule_def = get_rule_definition("SQL-006")
+                            doc_url = (
+                                rule_def.doc_url
+                                if rule_def
+                                else "https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-006"
+                            )
+                            diagnostics.append(
+                                Diagnostic(
+                                    id="SQL-006",
+                                    severity=Severity.WARNING,
+                                    category="framework",
+                                    title="Missing relationship eager loading strategy in async session",
+                                    message=(
+                                        f"Relationship on line {call_lineno} defined without explicit eager loading strategy "
+                                        f"(e.g., lazy='selectin' or lazy='joined'). Accessing it in async sessions may cause MissingGreenlet errors."
+                                    ),
+                                    evidence=[
+                                        Evidence(
+                                            fact=f"relationship() defined without explicit eager loading strategy on line {call_lineno}.",
+                                            source=file_path,
+                                        )
+                                    ],
+                                    suggestions=[
+                                        Suggestion(
+                                            description="Specify 'lazy=\"selectin\"' or 'lazy=\"joined\"' on the relationship definition.",
+                                            code_snippet="items = relationship('Item', lazy='selectin')",
+                                        )
+                                    ],
+                                    file=file_path,
+                                    line=call_lineno,
+                                    column=getattr(call_node, "col_offset", None),
+                                    doc_url=doc_url,
+                                )
+                            )
+
                         for kw in call_node.keywords:
                             if (
                                 kw.arg == "cascade"

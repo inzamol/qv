@@ -575,11 +575,21 @@ class ProjectDiscovery:
                 if not name:
                     continue
                 requires = dist.requires or []
+                requires_python = (
+                    dist.metadata.get("Requires-Python")
+                    if hasattr(dist.metadata, "get")
+                    else (
+                        dist.metadata["Requires-Python"]
+                        if "Requires-Python" in dist.metadata
+                        else None
+                    )
+                )
                 installed_packages[name.lower()] = InstalledDistribution(
                     name=name,
                     version=dist.version,
                     location=str(dist.locate_file("")),
                     requires=tuple(requires),
+                    requires_python=requires_python,
                 )
         except Exception:
             pass

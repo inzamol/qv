@@ -42,6 +42,7 @@ class InstalledDistribution:
     requires: tuple[str, ...] = ()
     required_by: tuple[str, ...] = ()
     direct_url: str | None = None
+    requires_python: str | None = None
 
 
 @dataclass(frozen=True)

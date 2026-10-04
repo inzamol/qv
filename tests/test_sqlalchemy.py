@@ -1,4 +1,4 @@
-"""Unit tests for SQLAlchemy & SQL Database Analyzer (SQL-001 through SQL-016)."""
+"""Unit tests for SQLAlchemy & SQL Database Analyzer (SQL-001 through SQL-030)."""
 
 from __future__ import annotations
 
@@ -173,6 +173,38 @@ def get_active_users(session: Session):
     query_diags = [d for d in diags if d.id == "SQL-005"]
     assert len(query_diags) >= 1
     assert any(d.id == "SQL-005" for d in diags)
+
+
+def test_sql_006_missing_relationship_eager_loading_strategy():
+    code = """
+from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy import Column, Integer, ForeignKey
+
+class Base(DeclarativeBase):
+    pass
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    posts = relationship("Post")
+
+class Post(Base):
+    __tablename__ = "posts"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    user = relationship("User", lazy="selectin")
+"""
+    ctx = make_context([("models.py", code), ("alembic.ini", "")])
+    analyzer = SqlAlchemyAnalyzer()
+    diags = analyzer.analyze(ctx)
+
+    lazy_diags = [d for d in diags if d.id == "SQL-006"]
+    assert len(lazy_diags) == 1
+    assert lazy_diags[0].severity == Severity.WARNING
+    assert (
+        "eager loading" in lazy_diags[0].title.lower()
+        or "lazy=" in lazy_diags[0].suggestions[0].description
+    )
 
 
 def test_sql_007_uncommitted_mutation():

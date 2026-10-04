@@ -247,3 +247,44 @@ def test_project_discovery_requirements_folder(tmp_path: Path):
     app_imports = [imp for imp in context.imports if imp.source_file.name == "app.py"]
     rel_imp = next(imp for imp in app_imports if imp.is_relative)
     assert rel_imp.resolved_module == "flower"
+
+
+def test_dep_004_python_compatibility_mismatch(tmp_path: Path):
+    runtime = PythonRuntime("3.8.0", 3, 8, 0)
+    # package requires Python >=3.10, but active runtime is 3.8.0
+    context = ProjectContext(
+        project_root=tmp_path,
+        project_name="incompatible-app",
+        python_runtime=runtime,
+        package_manager="uv",
+        manifest_files=(),
+        lock_files=(),
+        dependencies=(),
+        installed_packages={
+            "modern-pkg": InstalledDistribution(
+                name="modern-pkg",
+                version="2.0.0",
+                requires=(),
+                requires_python=">=3.10",
+            ),
+            "compat-pkg": InstalledDistribution(
+                name="compat-pkg",
+                version="1.0.0",
+                requires=(),
+                requires_python=">=3.7",
+            ),
+        },
+        source_files=(),
+        imports=(),
+        docker=DockerConfig(has_dockerfile=False),
+        ci=CIConfig(has_ci=False),
+    )
+
+    analyzer = DependencyAnalyzer()
+    diagnostics = analyzer.analyze(context)
+
+    compat_diags = [d for d in diagnostics if d.id == "DEP-004"]
+    assert len(compat_diags) == 1
+    assert compat_diags[0].severity == Severity.WARNING
+    assert "modern-pkg" in compat_diags[0].title
+    assert ">=3.10" in compat_diags[0].message
