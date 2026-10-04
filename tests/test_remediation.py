@@ -199,6 +199,88 @@ dependencies = []
     assert "httpx" in content
 
 
+def test_remediation_plan_dep003_requires_review(tmp_path: Path):
+    engine = RemediationEngine(project_root=tmp_path)
+    scan_result = ScanResult(
+        project_name="demo",
+        project_path=str(tmp_path),
+        python_version="3.12.0",
+        package_manager="uv",
+        summary=ScanSummary(warnings_count=1),
+        diagnostics=[
+            Diagnostic(
+                id="DEP-003",
+                severity=Severity.WARNING,
+                category="dependency",
+                title="No direct import detected: celery",
+                message="Package celery is unimported",
+                affected_packages=["celery"],
+            )
+        ],
+    )
+
+    plan = engine.plan_fixes(scan_result)
+    assert plan.total_fixes == 1
+    assert plan.safe_fixes_count == 0
+    assert plan.actions[0].is_safe is False
+
+    # apply_plan with only_safe=True should skip DEP-003
+    result_safe = engine.apply_plan(plan, only_safe=True)
+    assert len(result_safe.applied) == 0
+    assert len(result_safe.skipped) == 1
+    assert result_safe.skipped[0].id == plan.actions[0].id
+
+
+def test_cli_fix_dep003_skipped_with_yes(tmp_path: Path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """[project]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+    "celery>=5.2.0",
+]
+""",
+        encoding="utf-8",
+    )
+    app_file = tmp_path / "app.py"
+    app_file.write_text("x = 1\n", encoding="utf-8")
+
+    runner = CliRunner()
+    # qv fix -y should NOT automatically remove inferred unimported dependency
+    result = runner.invoke(cli, ["fix", str(tmp_path), "-y"])
+    assert result.exit_code == 0
+    assert "Skipped 1 action(s)" in result.output
+    assert "requires review" in result.output
+    # Verify celery was NOT removed
+    content = pyproject.read_text(encoding="utf-8")
+    assert "celery>=5.2.0" in content
+
+
+def test_cli_fix_dep003_applied_with_interactive_confirmation(tmp_path: Path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """[project]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+    "celery>=5.2.0",
+]
+""",
+        encoding="utf-8",
+    )
+    app_file = tmp_path / "app.py"
+    app_file.write_text("x = 1\n", encoding="utf-8")
+
+    runner = CliRunner()
+    # interactive qv fix confirmed by user
+    result = runner.invoke(cli, ["fix", str(tmp_path)], input="y\n")
+    assert result.exit_code == 0
+    assert "Successfully applied 1 fix(es)" in result.output
+    content = pyproject.read_text(encoding="utf-8")
+    assert "celery" not in content
+
+
 def test_remediation_execute_command_structured(tmp_path: Path, monkeypatch):
     """Test that command execution uses structured arguments with shell=False."""
     import subprocess

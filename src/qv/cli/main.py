@@ -394,16 +394,30 @@ def fix_cmd(
             console.print("\n[yellow]Dry-run mode enabled. No changes written to disk.[/yellow]")
             sys.exit(0)
 
-        if not auto_approve:
-            if not click.confirm("\nApply these safe fixes to your project?", default=True):
+        if auto_approve:
+            result = remediation_engine.apply_plan(
+                plan,
+                dry_run=False,
+                execute_commands=execute_sync,
+                only_safe=True,
+            )
+        else:
+            prompt_msg = (
+                "\nApply these safe fixes to your project?"
+                if plan.safe_fixes_count == len(plan.actions)
+                else "\nApply these fixes to your project (including review-required changes)?"
+            )
+            default_val = plan.safe_fixes_count == len(plan.actions)
+            if not click.confirm(prompt_msg, default=default_val):
                 console.print("[yellow]Remediation cancelled by user.[/yellow]")
                 sys.exit(0)
 
-        result = remediation_engine.apply_plan(
-            plan,
-            dry_run=False,
-            execute_commands=execute_sync,
-        )
+            result = remediation_engine.apply_plan(
+                plan,
+                dry_run=False,
+                execute_commands=execute_sync,
+                only_safe=False,
+            )
 
         console.print(
             f"\n[bold green]✓ Successfully applied {len(result.applied)} fix(es)![/bold green]"
@@ -414,7 +428,13 @@ def fix_cmd(
         if result.skipped:
             console.print(f"\n[yellow]Skipped {len(result.skipped)} action(s):[/yellow]")
             for act in result.skipped:
-                console.print(f"  [dim]- {act.description} (use --sync to run commands)[/dim]")
+                if not act.is_safe:
+                    reason = "requires review before removal"
+                elif act.action_type == FixActionType.EXECUTE_COMMAND:
+                    reason = "use --sync to run commands"
+                else:
+                    reason = "requires review"
+                console.print(f"  [dim]- {act.description} ({reason})[/dim]")
 
         if result.failed:
             console.print(f"\n[bold red]Failed {len(result.failed)} action(s):[/bold red]")

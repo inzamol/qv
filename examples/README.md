@@ -9,7 +9,7 @@ This directory contains standalone example projects demonstrating all diagnostic
 | Folder | Rule Triggered | Category | Description | Fixable with `qv fix` |
 |---|---|---|---|:---:|
 | **[`missing_dependencies/`](./missing_dependencies)** | `DEP-002` | Dependency | Code imports `httpx` and `pydantic`, but they are not declared in `pyproject.toml`. | ✅ Yes |
-| **[`unused_dependencies/`](./unused_dependencies)** | `DEP-003` | Dependency | `requests` and `pyyaml` are declared in `pyproject.toml`, but never imported in source code. | ✅ Yes |
+| **[`unused_dependencies/`](./unused_dependencies)** | `DEP-003` | Dependency | `requests` and `pyyaml` are declared in `pyproject.toml`, but never imported in source code. | ⚠️ Review Required |
 | **[`circular_imports/`](./circular_imports)** | `IMP-001` | Architecture | `module_a.py` and `module_b.py` import each other, forming a circular dependency cycle. | ℹ️ Architectural |
 | **[`unresolved_imports/`](./unresolved_imports)** | `IMP-002` | Architecture | Code imports `from app.auth.missing_token import verify_token`, which does not exist. | ℹ️ Code Edit |
 | **[`missing_metadata/`](./missing_metadata)** | `PKG-001` | Packaging | Bare `pyproject.toml` missing the required PEP 621 `[project]` metadata table. | ✅ Yes |
@@ -37,11 +37,11 @@ qv fix examples/missing_dependencies -y
 
 ### 2. Test Unused Dependencies (`DEP-003`)
 ```bash
-# Scan and see unused declared packages (requests, pyyaml)
+# Scan and see unimported declared packages (requests, pyyaml)
 qv scan examples/unused_dependencies
 
-# Automatically prune unused packages from pyproject.toml
-qv fix examples/unused_dependencies -y
+# Review and prune unimported packages interactively
+qv fix examples/unused_dependencies
 ```
 
 ### 3. Test Circular Import Cycle (`IMP-001`)

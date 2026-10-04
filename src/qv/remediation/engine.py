@@ -95,7 +95,7 @@ class RemediationEngine:
                             target_file=target_file,
                             diff=f"- {pkg}",
                             metadata={"package": pkg},
-                            is_safe=True,
+                            is_safe=False,
                         )
                     )
 
@@ -148,11 +148,16 @@ class RemediationEngine:
         plan: FixPlan,
         dry_run: bool = False,
         execute_commands: bool = False,
+        only_safe: bool = False,
     ) -> FixResult:
         """Apply the fixes in the plan to project files."""
         result = FixResult(project_path=plan.project_path, dry_run=dry_run)
 
         for action in plan.actions:
+            if only_safe and not action.is_safe:
+                result.skipped.append(action)
+                continue
+
             if dry_run:
                 result.applied.append(action)
                 continue
