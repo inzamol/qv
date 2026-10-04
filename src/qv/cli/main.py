@@ -628,7 +628,7 @@ def graph_cmd(
 @click.option("--json", "as_json", is_flag=True, help="Output JSON results.")
 @click.option("--sarif", "as_sarif", is_flag=True, help="Output SARIF results.")
 def framework_cmd(path: Path, name: str | None, as_json: bool, as_sarif: bool) -> None:
-    """Run framework-specific doctors (FastAPI, SQLAlchemy, Celery, Django)."""
+    """Run framework-specific doctors (FastAPI, SQLAlchemy)."""
     try:
         project = load_project(path)
 
