@@ -15,6 +15,10 @@ else:
 from qv.core.models import Severity
 
 
+class ConfigurationError(Exception):
+    """Raised when a configuration file cannot be parsed or contains invalid settings."""
+
+
 @dataclass
 class RuleConfig:
     """Per-rule configuration."""
@@ -85,34 +89,115 @@ class QvConfig:
         try:
             with open(pyproject_path, "rb") as f:
                 data = tomllib.load(f)
-        except Exception:
-            return cls()
+        except Exception as e:
+            raise ConfigurationError(
+                f"Failed to parse configuration file '{pyproject_path}': {e}"
+            ) from e
+
+        if not isinstance(data, dict):
+            raise ConfigurationError(f"Invalid TOML root in '{pyproject_path}': expected a table")
+
+        tool_table = data.get("tool")
+        if tool_table is not None and not isinstance(tool_table, dict):
+            raise ConfigurationError(
+                f"Invalid [tool] section in '{pyproject_path}': expected a table"
+            )
 
         # Support [tool.qv] as primary and [tool.pydoctor] as fallback
-        tool_config: dict[str, Any] = data.get("tool", {}).get("qv") or data.get("tool", {}).get(
-            "pydoctor", {}
-        )
-        if not tool_config:
+        tool_config: Any = None
+        if isinstance(tool_table, dict):
+            tool_config = tool_table.get("qv") or tool_table.get("pydoctor")
+
+        if tool_config is None:
             return cls()
 
+        if not isinstance(tool_config, dict):
+            raise ConfigurationError(
+                f"Invalid [tool.qv] section in '{pyproject_path}': expected a table"
+            )
+
         rules: dict[str, RuleConfig] = {}
-        for rule_id, sev_str in tool_config.get("rules", {}).items():
-            sev_str_lower = str(sev_str).lower()
-            if sev_str_lower == "off":
-                rules[rule_id] = RuleConfig(disabled=True)
-            elif sev_str_lower in ("error", "warning", "info"):
-                rules[rule_id] = RuleConfig(severity=Severity(sev_str_lower))
+        rules_table = tool_config.get("rules")
+        if rules_table is not None:
+            if not isinstance(rules_table, dict):
+                raise ConfigurationError(
+                    f"Invalid [tool.qv.rules] in '{pyproject_path}': expected a table of rule severities"
+                )
+            for rule_id, sev_str in rules_table.items():
+                if not isinstance(sev_str, str):
+                    raise ConfigurationError(
+                        f"Invalid severity value for rule '{rule_id}' in '{pyproject_path}': expected string, got {type(sev_str).__name__}"
+                    )
+                sev_str_lower = sev_str.strip().lower()
+                if sev_str_lower == "off":
+                    rules[rule_id] = RuleConfig(disabled=True)
+                elif sev_str_lower in ("error", "warning", "info"):
+                    rules[rule_id] = RuleConfig(severity=Severity(sev_str_lower))
+                else:
+                    raise ConfigurationError(
+                        f"Invalid severity '{sev_str}' for rule '{rule_id}' in '{pyproject_path}'. Expected one of: 'error', 'warning', 'info', 'off'."
+                    )
 
-        ignored_rules = set(tool_config.get("ignore", {}).get("rules", []))
+        ignored_rules: set[str] = set()
+        ignore_table = tool_config.get("ignore")
+        if ignore_table is not None:
+            if not isinstance(ignore_table, dict):
+                raise ConfigurationError(
+                    f"Invalid [tool.qv.ignore] in '{pyproject_path}': expected a table"
+                )
+            ignore_rules_list = ignore_table.get("rules")
+            if ignore_rules_list is not None:
+                if not isinstance(ignore_rules_list, (list, tuple, set)):
+                    raise ConfigurationError(
+                        f"Invalid [tool.qv.ignore.rules] in '{pyproject_path}': expected a list of rule IDs"
+                    )
+                for r in ignore_rules_list:
+                    if not isinstance(r, str):
+                        raise ConfigurationError(
+                            f"Invalid rule ID in [tool.qv.ignore.rules] in '{pyproject_path}': expected string"
+                        )
+                    ignored_rules.add(r.strip())
 
-        paths_dict = tool_config.get("paths", {})
-        paths = PathConfig(
-            exclude=paths_dict.get("exclude", PathConfig().exclude),
-            include=paths_dict.get("include", []),
+        paths_dict = tool_config.get("paths")
+        if paths_dict is not None and not isinstance(paths_dict, dict):
+            raise ConfigurationError(
+                f"Invalid [tool.qv.paths] in '{pyproject_path}': expected a table"
+            )
+        if isinstance(paths_dict, dict):
+            exclude_val = paths_dict.get("exclude")
+            if exclude_val is not None and not isinstance(exclude_val, (list, tuple)):
+                raise ConfigurationError(
+                    f"Invalid [tool.qv.paths.exclude] in '{pyproject_path}': expected a list"
+                )
+            include_val = paths_dict.get("include")
+            if include_val is not None and not isinstance(include_val, (list, tuple)):
+                raise ConfigurationError(
+                    f"Invalid [tool.qv.paths.include] in '{pyproject_path}': expected a list"
+                )
+            paths = PathConfig(
+                exclude=list(exclude_val) if exclude_val is not None else PathConfig().exclude,
+                include=list(include_val) if include_val is not None else [],
+            )
+        else:
+            paths = PathConfig()
+
+        runtime_dict = tool_config.get("runtime")
+        if runtime_dict is not None and not isinstance(runtime_dict, dict):
+            raise ConfigurationError(
+                f"Invalid [tool.qv.runtime] in '{pyproject_path}': expected a table"
+            )
+        target_python = (
+            runtime_dict.get("python") if isinstance(runtime_dict, dict) else None
+        ) or (
+            data.get("project", {}).get("requires-python")
+            if isinstance(data.get("project"), dict)
+            else None
         )
+        if target_python is not None and not isinstance(target_python, str):
+            raise ConfigurationError(
+                f"Invalid python runtime target in '{pyproject_path}': expected string"
+            )
 
-        runtime_dict = tool_config.get("runtime", {})
-        target_python = runtime_dict.get("python") or data.get("project", {}).get("requires-python")
         offline = bool(tool_config.get("offline", False))
         hide_warnings = bool(
             tool_config.get("hide_warnings", tool_config.get("hide-warnings", False))
@@ -123,11 +208,18 @@ class QvConfig:
             or tool_config.get("min-severity")
             or tool_config.get("severity")
         )
-        min_severity = (
-            Severity(str(min_sev_str).lower())
-            if min_sev_str and str(min_sev_str).lower() in ("error", "warning", "info")
-            else None
-        )
+        if min_sev_str is not None:
+            if not isinstance(min_sev_str, str) or min_sev_str.strip().lower() not in (
+                "error",
+                "warning",
+                "info",
+            ):
+                raise ConfigurationError(
+                    f"Invalid min_severity '{min_sev_str}' in '{pyproject_path}'. Expected one of: 'error', 'warning', 'info'."
+                )
+            min_severity = Severity(min_sev_str.strip().lower())
+        else:
+            min_severity = None
 
         return cls(
             rules=rules,

@@ -14,6 +14,7 @@ from qv import __version__
 from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
 from qv.analyzers.environment.drift import EnvironmentAnalyzer
 from qv.analyzers.imports.analyzer import ImportAnalyzer
+from qv.core.config import ConfigurationError
 from qv.core.engine import AnalysisEngine
 from qv.core.models import Severity
 from qv.core.project import load_project
@@ -171,6 +172,9 @@ def scan(
             sys.exit(1)
         sys.exit(0)
 
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
     except click.ClickException:
         raise
     except SystemExit:
@@ -263,11 +267,22 @@ exclude = [
 )
 def dependency_cmd(path: Path) -> None:
     """Run dependency-focused checks only."""
-    project = load_project(path)
-    engine = AnalysisEngine(config=project.config, analyzers=[DependencyAnalyzer()])
-    result = engine.run(project.context)
-    TerminalReporter(console=console).print_result(result)
-    sys.exit(1 if result.has_blocking_errors else 0)
+    try:
+        project = load_project(path)
+        engine = AnalysisEngine(config=project.config, analyzers=[DependencyAnalyzer()])
+        result = engine.run(project.context)
+        TerminalReporter(console=console).print_result(result)
+        sys.exit(1 if result.has_blocking_errors else 0)
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Analysis failed:[/bold red] {e}")
+        sys.exit(3)
 
 
 @cli.command("environment")
@@ -278,11 +293,22 @@ def dependency_cmd(path: Path) -> None:
 )
 def environment_cmd(path: Path) -> None:
     """Run environment and runtime drift checks only."""
-    project = load_project(path)
-    engine = AnalysisEngine(config=project.config, analyzers=[EnvironmentAnalyzer()])
-    result = engine.run(project.context)
-    TerminalReporter(console=console).print_result(result)
-    sys.exit(1 if result.has_blocking_errors else 0)
+    try:
+        project = load_project(path)
+        engine = AnalysisEngine(config=project.config, analyzers=[EnvironmentAnalyzer()])
+        result = engine.run(project.context)
+        TerminalReporter(console=console).print_result(result)
+        sys.exit(1 if result.has_blocking_errors else 0)
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Analysis failed:[/bold red] {e}")
+        sys.exit(3)
 
 
 @cli.command("architecture")
@@ -293,11 +319,22 @@ def environment_cmd(path: Path) -> None:
 )
 def architecture_cmd(path: Path) -> None:
     """Run AST and import architecture checks only."""
-    project = load_project(path)
-    engine = AnalysisEngine(config=project.config, analyzers=[ImportAnalyzer()])
-    result = engine.run(project.context)
-    TerminalReporter(console=console).print_result(result)
-    sys.exit(1 if result.has_blocking_errors else 0)
+    try:
+        project = load_project(path)
+        engine = AnalysisEngine(config=project.config, analyzers=[ImportAnalyzer()])
+        result = engine.run(project.context)
+        TerminalReporter(console=console).print_result(result)
+        sys.exit(1 if result.has_blocking_errors else 0)
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Analysis failed:[/bold red] {e}")
+        sys.exit(3)
 
 
 @cli.command("fix")
@@ -444,6 +481,9 @@ def fix_cmd(
 
         sys.exit(0)
 
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
     except (click.Abort, KeyboardInterrupt):
         console.print("\n[yellow]Remediation cancelled.[/yellow]")
         sys.exit(0)
@@ -528,6 +568,9 @@ def tree_cmd(
 
         sys.exit(0)
 
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
     except click.ClickException:
         raise
     except SystemExit:
@@ -623,6 +666,9 @@ def framework_cmd(path: Path, name: str | None, as_json: bool, as_sarif: bool) -
         if result.has_blocking_errors:
             sys.exit(1)
         sys.exit(0)
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
     except click.ClickException:
         raise
     except SystemExit:
@@ -668,6 +714,13 @@ def inspect_cmd(path: Path, offline: bool) -> None:
 
         explorer = TuiExplorer(result=result, console=console)
         explorer.run()
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
     except Exception as e:
         console.print(f"[bold red]Error running interactive inspector: {e}[/bold red]")
         sys.exit(3)
