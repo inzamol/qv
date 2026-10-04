@@ -58,7 +58,6 @@ docs = [
 [project.scripts]
 qv = "qv.cli.main:cli"
 python-qv = "qv.cli.main:cli"
-pydoctor = "qv.cli.main:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/qv"]
