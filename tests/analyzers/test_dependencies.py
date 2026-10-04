@@ -250,6 +250,7 @@ def test_project_discovery_requirements_folder(tmp_path: Path):
 
 
 def test_dep_004_python_compatibility_mismatch(tmp_path: Path):
+    """Test that DEP-004 is reported when an installed package's Requires-Python is incompatible with the active runtime."""
     runtime = PythonRuntime("3.8.0", 3, 8, 0)
     # package requires Python >=3.10, but active runtime is 3.8.0
     context = ProjectContext(

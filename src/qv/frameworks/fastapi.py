@@ -76,6 +76,7 @@ class FastApiAnalyzer(FrameworkPlugin):
     rules: tuple[str, ...] = tuple(f"FAP-{i:03d}" for i in range(1, 39))
 
     def __init__(self) -> None:
+        """Initialize the analyzer with an OK status until analysis determines otherwise."""
         self.status: AnalyzerStatus = AnalyzerStatus.OK
 
     def detect(self, context: ProjectContext) -> bool:
