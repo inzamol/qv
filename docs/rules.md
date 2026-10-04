@@ -16,10 +16,10 @@
 - **Description:** A third-party package is imported in project source code but is not declared in `pyproject.toml` or requirements files.
 - **Remediation:** Add the missing package to your project dependencies (`uv add <package>` or `pip install <package>`).
 
-### 1.3 DEP-003: Unused Declared Dependency
+### 1.3 DEP-003: No Direct Import Detected
 - **Default Severity:** `WARNING`
-- **Description:** A package is declared as a direct dependency, but no import statements were detected across project source files.
-- **Remediation:** Verify if this dependency is required at runtime or remove it to keep dependencies lean.
+- **Description:** A package is declared as a direct dependency, but no direct imports were detected across project source files.
+- **Remediation:** Verify if this dependency is used dynamically, required as a plugin/driver, or can be safely removed.
 
 ### 1.4 DEP-004: Python Compatibility Mismatch
 - **Default Severity:** `WARNING`

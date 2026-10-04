@@ -44,7 +44,7 @@ def test_github_annotator_writes_step_summary(tmp_path: Path):
         id="DEP-003",
         severity=Severity.WARNING,
         category="dependency",
-        title="Unused declared dependency: requests",
+        title="No direct import detected: requests",
         message="Declared 'requests' is never imported.",
         file="pyproject.toml",
     )
@@ -64,4 +64,4 @@ def test_github_annotator_writes_step_summary(tmp_path: Path):
     content = summary_file.read_text(encoding="utf-8")
     assert "# 🔍 qv Health Report: proj" in content
     assert "DEP-003" in content
-    assert "Unused declared dependency: requests" in content
+    assert "No direct import detected: requests" in content

@@ -470,17 +470,21 @@ class DependencyAnalyzer:
                     id=rule.id,
                     severity=rule.default_severity,
                     category=rule.category,
-                    title=f"Unused declared dependency: {dep.name}",
-                    message=f"Package '{dep.name}' is declared in {dep.source_file.name} but no imports were detected in project source files.",
+                    title=f"No direct import detected: {dep.name}",
+                    message=f"Package '{dep.name}' is declared in {dep.source_file.name}, but no direct import was detected across project source files.",
                     evidence=[
                         Evidence(
                             fact=f"Declared requirement: {dep.name}{dep.specifier} in {dep.source_file.name}",
                             source=str(dep.source_file),
-                        )
+                        ),
+                        Evidence(
+                            fact="No direct import statements matching this package were found in project source files.",
+                            source="AST Import Analysis",
+                        ),
                     ],
                     suggestions=[
                         Suggestion(
-                            description=f"Remove '{dep.name}' from dependencies if not needed at runtime.",
+                            description=f"Verify if '{dep.name}' is used dynamically, as a runtime plugin/driver, or remove it if unused.",
                             executable=context.package_manager
                             if context.package_manager in ("uv", "poetry")
                             else None,

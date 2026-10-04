@@ -34,8 +34,8 @@ The dashboard splits into two primary panes alongside an informative header and 
 │  👉 ERR   DEP-001  Dependency constraint conflict                  │ celery requires kombu<5.4.0,>=5.3.0│
 │     ERR   DEP-002  Missing dependency: httpx                       │ Location: pyproject.toml           │
 │     ERR   DEP-002  Missing dependency: pydantic                    │                                    │
-│     WARN  DEP-003  Unused declared dependency: requests            │ Remediation:                       │
-│     WARN  DEP-003  Unused declared dependency: pyyaml              │   👉 Pin kombu to <5.4.0,>=5.3.0   │
+│     WARN  DEP-003  No direct import detected: requests             │ Remediation:                       │
+│     WARN  DEP-003  No direct import detected: pyyaml               │   👉 Pin kombu to <5.4.0,>=5.3.0   │
 │     ... 1 more below ...                                           │      $ pip install 'kombu<5.4.0'   │
 ├────────────────────────────────────────────────────────────────────┴────────────────────────────────────┤
 │ [↑/k, ↓/j] Navigate  •  [Enter] Expand  •  [f] Apply Fix  •  [t] Tree View  •  [q] Quit                 │
