@@ -641,7 +641,7 @@ repos:
 
 ---
 
-## Documentation
+## Documentation & Community
 
 Full documentation is available at **[inzamol.github.io/qv](https://inzamol.github.io/qv/)**.
 
@@ -650,7 +650,9 @@ Full documentation is available at **[inzamol.github.io/qv](https://inzamol.gith
 - [Diagnostic Rules Catalog](https://inzamol.github.io/qv/rules/)
 - [Configuration Guide](https://inzamol.github.io/qv/configuration/)
 - [CI/CD & SARIF Integration](https://inzamol.github.io/qv/ci_integration/)
-- [Contributing Guidelines](https://inzamol.github.io/qv/contributing/)
+- [Contributing Guidelines](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
 
 ---
 

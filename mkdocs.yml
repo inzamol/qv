@@ -84,4 +84,6 @@ nav:
   - Integration:
       - CI/CD & GitHub Actions: ci_integration.md
       - Pre-commit Hooks: pre_commit.md
-  - Contributing Guide: contributing.md
+  - Community:
+      - Contributing Guide: contributing.md
+      - Code of Conduct: code_of_conduct.md
