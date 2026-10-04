@@ -494,6 +494,7 @@ class DependencyAnalyzer:
                             command=f"{context.package_manager} remove {dep.name}"
                             if context.package_manager in ("uv", "poetry")
                             else None,
+                            is_safe=False,
                         )
                     ],
                     affected_packages=[dep.name],

@@ -108,7 +108,7 @@ repos:
 | Hook ID | Description | Default Command |
 |---|---|---|
 | `qv-scan` | Runs diagnostic health scan on the project | `qv scan` |
-| `qv-fix` | Automatically fixes safe issues (`DEP-002`, `DEP-003`, `ENV-002`, `PKG-001`) | `qv fix -y` |
+| `qv-fix` | Automatically fixes safe issues (`DEP-002`, `ENV-002`, `PKG-001`) | `qv fix -y` |
 
 ---
 

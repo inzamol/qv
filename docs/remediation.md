@@ -33,8 +33,9 @@ qv fix --sync -y
 
 | Fix Category | Example | Behavior |
 |---|---|---|
-| **Safe (Deterministic)** | Adding missing dependencies to `pyproject.toml` (`DEP-002`)<br>Removing unused declared dependencies (`DEP-003`)<br>Adding default `[tool.qv]` settings (`PKG-001`) | Applied automatically with `-y` or after confirmation. |
-| **Command-Assisted** | Running `uv add` or `pip install` (`DEP-001`, `DEP-005`) | Proposed as shell commands. Only executed if `--sync` is explicitly passed. |
+| **Safe (Deterministic)** | Adding missing dependencies to `pyproject.toml` (`DEP-002`)<br>Adding default `[project]` / `[tool.qv]` settings (`PKG-001`) | Applied automatically with `-y` or after interactive confirmation. |
+| **Review Required** | Removing unimported declared dependencies (`DEP-003`) | Requires explicit review because packages may be used dynamically, as plugins, or as database drivers. Skipped during `-y`. |
+| **Command-Assisted** | Running `uv add` or `pip install` (`DEP-001`, `DEP-005`, `DEP-006`) | Proposed as shell commands. Only executed if `--sync` is explicitly passed. |
 | **Manual / Complex** | Refactoring circular import cycles (`IMP-001`) | Provides architectural refactoring hints and code snippets for human review; no blind mutations. |
 
 ---
