@@ -112,3 +112,13 @@ dependencies = []
     runner = CliRunner()
     result = runner.invoke(cli, ["frameworks", str(tmp_path), "--name", "fastapi"])
     assert result.exit_code == 0
+
+
+def test_cli_help_framework_advertisement():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "Celery" not in result.output
+    assert "Django" not in result.output
+    assert "FastAPI" in result.output
+    assert "SQLAlchemy" in result.output
