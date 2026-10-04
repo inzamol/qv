@@ -212,6 +212,7 @@ class DependencyAnalyzer:
     )
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+        """Run all dependency sub-checks and return the combined diagnostics."""
         diagnostics: list[Diagnostic] = []
 
         # Run individual sub-checks

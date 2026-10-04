@@ -94,6 +94,7 @@ class ImportAnalyzer:
     )
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+        """Run all import-related checks and return the combined diagnostics."""
         diagnostics: list[Diagnostic] = []
 
         diagnostics.extend(self._check_circular_imports(context))

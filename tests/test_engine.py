@@ -24,6 +24,7 @@ class CrashingAnalyzer(Analyzer):
     rules: tuple[str, ...] = ("CRASH-001",)
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+        """Raise a RuntimeError to simulate an analyzer crash."""
         raise RuntimeError("Simulated internal analyzer crash in parsing AST")
 
 
@@ -36,6 +37,7 @@ class HealthyAnalyzer(Analyzer):
     rules: tuple[str, ...] = ("DEP-003", "DEP-004")
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+        """Return a sample DEP-003 warning diagnostic."""
         return [
             Diagnostic(
                 id="DEP-003",
@@ -48,6 +50,7 @@ class HealthyAnalyzer(Analyzer):
 
 
 def create_sample_context(tmp_path: Path) -> ProjectContext:
+    """Build a minimal ProjectContext for use in engine tests."""
     return ProjectContext(
         project_root=tmp_path,
         project_name="test-proj",
@@ -149,6 +152,7 @@ dependencies = []
     original_init = AnalysisEngine.__init__
 
     def mock_init(self, config=None, analyzers=None):
+        """Patch AnalysisEngine.__init__ to always use a CrashingAnalyzer."""
         original_init(self, config=config, analyzers=[CrashingAnalyzer()])
 
     monkeypatch.setattr(AnalysisEngine, "__init__", mock_init)

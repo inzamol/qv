@@ -176,6 +176,7 @@ def get_active_users(session: Session):
 
 
 def test_sql_006_missing_relationship_eager_loading_strategy():
+    """Test that SQL-006 is reported for relationships lacking an explicit eager loading strategy."""
     code = """
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy import Column, Integer, ForeignKey
