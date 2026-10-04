@@ -122,3 +122,22 @@ def test_cli_help_framework_advertisement():
     assert "Django" not in result.output
     assert "FastAPI" in result.output
     assert "SQLAlchemy" in result.output
+
+
+def test_project_scripts_entry_points():
+    import sys
+    from pathlib import Path
+
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        import tomli as tomllib
+
+    pyproject_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
+    with open(pyproject_path, "rb") as f:
+        data = tomllib.load(f)
+
+    scripts = data.get("project", {}).get("scripts", {})
+    assert "pydoctor" not in scripts
+    assert "qv" in scripts
+    assert "python-qv" in scripts
