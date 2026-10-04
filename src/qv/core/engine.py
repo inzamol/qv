@@ -59,11 +59,12 @@ class AnalysisEngine:
             analyzer_name = getattr(analyzer, "name", analyzer.__class__.__name__)
             try:
                 findings = analyzer.analyze(context)
+                status = getattr(analyzer, "status", AnalyzerStatus.OK)
                 raw_diagnostics.extend(findings)
                 analyzer_results.append(
                     AnalyzerExecutionResult(
                         analyzer_name=analyzer_name,
-                        status=AnalyzerStatus.OK,
+                        status=status,
                         diagnostics_count=len(findings),
                     )
                 )

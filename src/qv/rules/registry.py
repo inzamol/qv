@@ -77,6 +77,16 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         remediation_hint="Update the vulnerable dependency or apply vendor security patches.",
         doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-006--vulnerable-transitive-dependency",
     ),
+    # Security rules
+    "SEC-001": RuleDefinition(
+        id="SEC-001",
+        category="security",
+        title="Security analysis unavailable",
+        description="The advisory database (OSV.dev) could not be reached to perform vulnerability checks.",
+        default_severity=Severity.WARNING,
+        remediation_hint="Check your internet connection or run with --offline to skip security checks.",
+        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sec-001--security-analysis-unavailable",
+    ),
     # Environment rules
     "ENV-001": RuleDefinition(
         id="ENV-001",

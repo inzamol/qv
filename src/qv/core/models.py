@@ -61,6 +61,7 @@ class AnalyzerStatus(str, Enum):
     OK = "ok"
     FAILED = "failed"
     SKIPPED = "skipped"
+    UNKNOWN = "unknown"
 
 
 class AnalyzerExecutionResult(BaseModel):

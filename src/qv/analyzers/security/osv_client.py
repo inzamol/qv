@@ -24,6 +24,10 @@ class Vulnerability:
     severity: str | None = None
 
 
+class OsvUnavailableError(Exception):
+    """Raised when the OSV.dev advisory API is unreachable or returns an error."""
+
+
 class OsvClient:
     """Fast, lightweight client for the OSV.dev batch query API."""
 
@@ -36,7 +40,10 @@ class OsvClient:
     def query_packages(
         self, packages: list[tuple[str, str]]
     ) -> dict[tuple[str, str], list[Vulnerability]]:
-        """Batch query multiple (package_name, version) pairs against OSV.dev."""
+        """Batch query multiple (package_name, version) pairs against OSV.dev.
+
+        Raises OsvUnavailableError if OSV.dev API cannot be reached or returns an error.
+        """
         results: dict[tuple[str, str], list[Vulnerability]] = {}
         uncached: list[tuple[str, str]] = []
 
@@ -83,12 +90,8 @@ class OsvClient:
                             vulns_list.append(vuln)
                         self._cache[key] = vulns_list
                         results[key] = vulns_list
-            except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
-                # Return empty list on network or parse failures without crashing
-                for name, ver in chunk:
-                    key = (name.lower(), ver)
-                    self._cache[key] = []
-                    results[key] = []
+            except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as err:
+                raise OsvUnavailableError(f"Failed to reach OSV.dev advisory API: {err}") from err
 
         return results
 

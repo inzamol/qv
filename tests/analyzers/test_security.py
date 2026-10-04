@@ -6,8 +6,10 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from qv.analyzers.security.analyzer import SecurityAnalyzer
-from qv.analyzers.security.osv_client import OsvClient, Vulnerability
+from qv.analyzers.security.osv_client import OsvClient, OsvUnavailableError, Vulnerability
 from qv.core.context import (
     CIConfig,
     DependencyDeclaration,
@@ -16,7 +18,7 @@ from qv.core.context import (
     ProjectContext,
     PythonRuntime,
 )
-from qv.core.models import Severity
+from qv.core.models import AnalyzerStatus, Severity
 
 
 def test_osv_client_query_parsing():
@@ -152,3 +154,87 @@ def test_security_analyzer_skips_when_offline(tmp_path: Path):
 
     assert len(diagnostics) == 0
     mock_osv.query_packages.assert_not_called()
+    assert analyzer.status == AnalyzerStatus.SKIPPED
+
+
+def test_osv_client_raises_unavailable_on_network_error():
+    import urllib.error
+
+    client = OsvClient()
+    with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Connection refused")):
+        with pytest.raises(OsvUnavailableError, match="Failed to reach OSV.dev"):
+            client.query_packages([("requests", "2.31.0")])
+
+
+def test_security_analyzer_represents_unavailable_as_unknown(tmp_path: Path):
+    """Test Issue #7: Unavailable OSV results are represented as UNKNOWN rather than empty."""
+    runtime = PythonRuntime(version_str="3.11.0", major=3, minor=11, micro=0)
+    context = ProjectContext(
+        project_root=tmp_path,
+        project_name="demo",
+        python_runtime=runtime,
+        package_manager="uv",
+        manifest_files=(),
+        lock_files=(),
+        dependencies=(
+            DependencyDeclaration(
+                name="requests",
+                specifier="==2.31.0",
+                source_file=tmp_path / "pyproject.toml",
+            ),
+        ),
+        installed_packages={
+            "requests": InstalledDistribution(name="requests", version="2.31.0"),
+        },
+        source_files=(),
+        imports=(),
+        docker=DockerConfig(has_dockerfile=False),
+        ci=CIConfig(has_ci=False),
+    )
+
+    mock_osv = MagicMock()
+    mock_osv.query_packages.side_effect = OsvUnavailableError("Connection timeout to OSV API")
+
+    analyzer = SecurityAnalyzer(osv_client=mock_osv)
+    diagnostics = analyzer.analyze(context)
+
+    assert analyzer.status == AnalyzerStatus.UNKNOWN
+    assert len(diagnostics) == 1
+    d = diagnostics[0]
+    assert d.id == "SEC-001"
+    assert d.title == "Security analysis unavailable"
+    assert "UNKNOWN" in d.message
+    assert d.metadata.get("status") == "UNKNOWN"
+
+
+def test_analysis_engine_and_cli_with_unavailable_osv(tmp_path: Path):
+    """Integration test: AnalysisEngine and CLI report UNKNOWN status and diagnostic when OSV is blocked."""
+    import urllib.error
+
+    from click.testing import CliRunner
+
+    from qv.cli.main import cli
+
+    project_dir = tmp_path / "demo_proj"
+    project_dir.mkdir()
+    pyproject = project_dir / "pyproject.toml"
+    pyproject.write_text(
+        """[project]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+    "requests==2.31.0",
+]
+""",
+        encoding="utf-8",
+    )
+
+    req_file = project_dir / "requirements.txt"
+    req_file.write_text("requests==2.31.0\n", encoding="utf-8")
+
+    with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Network unreachable")):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["scan", str(project_dir)])
+        assert result.exit_code == 0
+        assert "Security analysis unavailable" in result.output
+        assert "UNKNOWN" in result.output
