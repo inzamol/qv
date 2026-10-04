@@ -5,16 +5,24 @@ from __future__ import annotations
 import re
 import shlex
 import subprocess
-import sys
 from pathlib import Path
+
+import tomlkit
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 from qv.core.models import ScanResult
 from qv.remediation.models import FixAction, FixActionType, FixPlan, FixResult
 
-if sys.version_info >= (3, 11):
-    pass
-else:
-    pass
+
+def _get_canonical_package_name(spec: str) -> str:
+    """Extract canonical package name from requirement specification string."""
+    clean_spec = spec.strip()
+    try:
+        return canonicalize_name(Requirement(clean_spec).name)
+    except Exception:
+        raw = re.split(r"[><=~!^;\[ ]", clean_spec)[0].strip()
+        return canonicalize_name(raw)
 
 
 class RemediationEngine:
@@ -196,45 +204,52 @@ class RemediationEngine:
         pyproject_file = self.root / "pyproject.toml"
 
         if not pyproject_file.exists():
-            content = f'[project]\nname = "{self.root.name}"\nversion = "0.1.0"\ndependencies = [\n    "{package}",\n]\n'
-            pyproject_file.write_text(content, encoding="utf-8")
+            doc = tomlkit.document()
+            project = tomlkit.table()
+            project["name"] = self.root.name
+            project["version"] = "0.1.0"
+            deps = tomlkit.array()
+            deps.append(package)
+            deps.multiline(True)
+            project["dependencies"] = deps
+            doc["project"] = project
+            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
             return
 
         content = pyproject_file.read_text(encoding="utf-8")
+        doc = tomlkit.parse(content)
 
-        # Check if dependencies array exists
-        dep_match = re.search(r"dependencies\s*=\s*\[(.*?)\]", content, re.DOTALL)
-        if dep_match:
-            raw_deps = dep_match.group(1)
-            # Extract existing dependency strings
-            existing_items = re.findall(r'["\']([^"\']+)["\']', raw_deps)
+        pkg_canonical = _get_canonical_package_name(package)
 
-            # Check if package is already declared (e.g. click or click>=8.0)
-            pkg_names = [re.split(r"[><=~!^ ]", item)[0].strip() for item in existing_items]
-            if package not in pkg_names:
-                existing_items.append(package)
-
-            formatted_deps = "\n".join(f'    "{item}",' for item in existing_items)
-            new_dep_block = f"dependencies = [\n{formatted_deps}\n]"
-            updated = content[: dep_match.start()] + new_dep_block + content[dep_match.end() :]
-            pyproject_file.write_text(updated, encoding="utf-8")
-        elif "[project]" in content:
-            # Insert dependencies array under [project]
-            pattern = r"(\[project\][^\[]*)"
-            updated = re.sub(
-                pattern,
-                r'\1dependencies = [\n    "' + package + r'",\n]\n',
-                content,
-                count=1,
-            )
-            pyproject_file.write_text(updated, encoding="utf-8")
+        if "project" not in doc:
+            project = tomlkit.table()
+            project["name"] = self.root.name
+            project["version"] = "0.1.0"
+            deps = tomlkit.array()
+            deps.append(package)
+            deps.multiline(True)
+            project["dependencies"] = deps
+            doc["project"] = project
         else:
-            # Append [project] section
-            updated = (
-                content.rstrip()
-                + f'\n\n[project]\nname = "{self.root.name}"\nversion = "0.1.0"\ndependencies = [\n    "{package}",\n]\n'
-            )
-            pyproject_file.write_text(updated, encoding="utf-8")
+            project = doc["project"]
+            if not isinstance(project, dict):
+                project = tomlkit.table()
+                doc["project"] = project
+
+            if "dependencies" not in project:
+                deps = tomlkit.array()
+                deps.append(package)
+                deps.multiline(True)
+                project["dependencies"] = deps
+            else:
+                existing_deps = project["dependencies"]
+                existing_canonical_names = [
+                    _get_canonical_package_name(str(item)) for item in existing_deps
+                ]
+                if pkg_canonical not in existing_canonical_names:
+                    existing_deps.append(package)
+
+        pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
 
     def _remove_dependency_from_pyproject(self, package: str) -> None:
         """Remove a dependency from pyproject.toml [project.dependencies]."""
@@ -243,22 +258,27 @@ class RemediationEngine:
             return
 
         content = pyproject_file.read_text(encoding="utf-8")
-        dep_match = re.search(r"dependencies\s*=\s*\[(.*?)\]", content, re.DOTALL)
-        if dep_match:
-            raw_deps = dep_match.group(1)
-            existing_items = re.findall(r'["\']([^"\']+)["\']', raw_deps)
-            filtered_items = [
-                item
-                for item in existing_items
-                if re.split(r"[><=~!^ ]", item)[0].strip() != package
-            ]
-            if filtered_items:
-                formatted_deps = "\n".join(f'    "{item}",' for item in filtered_items)
-                new_dep_block = f"dependencies = [\n{formatted_deps}\n]"
-            else:
-                new_dep_block = "dependencies = []"
-            updated = content[: dep_match.start()] + new_dep_block + content[dep_match.end() :]
-            pyproject_file.write_text(updated, encoding="utf-8")
+        doc = tomlkit.parse(content)
+
+        if "project" not in doc or not isinstance(doc["project"], dict):
+            return
+
+        project = doc["project"]
+        if "dependencies" not in project:
+            return
+
+        existing_deps = project["dependencies"]
+        target_canonical = _get_canonical_package_name(package)
+
+        indices_to_remove = []
+        for i, item in enumerate(existing_deps):
+            if _get_canonical_package_name(str(item)) == target_canonical:
+                indices_to_remove.append(i)
+
+        if indices_to_remove:
+            for i in reversed(indices_to_remove):
+                del existing_deps[i]
+            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
 
     def _add_dependency_to_requirements(self, package: str) -> None:
         """Add a dependency to requirements.txt."""
@@ -269,7 +289,10 @@ class RemediationEngine:
 
         content = req_file.read_text(encoding="utf-8")
         lines = [line.strip() for line in content.splitlines()]
-        if package not in lines:
+        canonical_existing = [
+            _get_canonical_package_name(line) for line in lines if line and not line.startswith("#")
+        ]
+        if _get_canonical_package_name(package) not in canonical_existing:
             updated = content.rstrip() + f"\n{package}\n"
             req_file.write_text(updated, encoding="utf-8")
 
@@ -280,28 +303,45 @@ class RemediationEngine:
             return
 
         lines = req_file.read_text(encoding="utf-8").splitlines()
-        filtered = [line for line in lines if not line.strip().startswith(package)]
+        target_canonical = _get_canonical_package_name(package)
+        filtered = [
+            line
+            for line in lines
+            if line.startswith("#")
+            or not line.strip()
+            or _get_canonical_package_name(line) != target_canonical
+        ]
         req_file.write_text("\n".join(filtered) + "\n" if filtered else "", encoding="utf-8")
 
     def _initialize_pyproject_metadata(self, project_name: str) -> None:
         """Initialize standard PEP 621 metadata in pyproject.toml."""
         pyproject_file = self.root / "pyproject.toml"
-        default_section = f"""[project]
-name = "{project_name}"
-version = "0.1.0"
-description = "Add project description here"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = []
-"""
+
         if not pyproject_file.exists():
-            pyproject_file.write_text(default_section, encoding="utf-8")
+            doc = tomlkit.document()
+            project = tomlkit.table()
+            project["name"] = project_name
+            project["version"] = "0.1.0"
+            project["description"] = "Add project description here"
+            project["readme"] = "README.md"
+            project["requires-python"] = ">=3.10"
+            project["dependencies"] = tomlkit.array()
+            doc["project"] = project
+            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
             return
 
         content = pyproject_file.read_text(encoding="utf-8")
-        if "[project]" not in content:
-            updated = default_section + "\n" + content
-            pyproject_file.write_text(updated, encoding="utf-8")
+        doc = tomlkit.parse(content)
+        if "project" not in doc:
+            project = tomlkit.table()
+            project["name"] = project_name
+            project["version"] = "0.1.0"
+            project["description"] = "Add project description here"
+            project["readme"] = "README.md"
+            project["requires-python"] = ">=3.10"
+            project["dependencies"] = tomlkit.array()
+            doc["project"] = project
+            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
 
     ALLOWED_PACKAGE_MANAGERS: set[str] = {
         "uv",

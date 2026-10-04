@@ -30,6 +30,7 @@ dependencies = [
     "packaging>=23.2",
     "pydantic>=2.5.0",
     "tomli>=2.0.1; python_version < '3.11'",
+    "tomlkit>=0.15.1",
 ]
 
 [project.urls]
