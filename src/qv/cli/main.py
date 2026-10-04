@@ -14,10 +14,9 @@ from qv import __version__
 from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
 from qv.analyzers.environment.drift import EnvironmentAnalyzer
 from qv.analyzers.imports.analyzer import ImportAnalyzer
-from qv.core.config import QvConfig
 from qv.core.engine import AnalysisEngine
 from qv.core.models import Severity
-from qv.core.project import ProjectDiscovery
+from qv.core.project import load_project
 from qv.frameworks import AVAILABLE_FRAMEWORK_ANALYZERS
 from qv.remediation.engine import RemediationEngine
 from qv.remediation.models import FixActionType
@@ -114,8 +113,8 @@ def scan(
 ) -> None:
     """Scan a Python project and report health findings."""
     try:
-        pyproject_path = path / "pyproject.toml"
-        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
+        project = load_project(path)
+        config = project.config
         if strict or ci_mode:
             config.strict = True
         if offline:
@@ -127,11 +126,8 @@ def scan(
         if min_severity:
             config.min_severity = Severity(min_severity.lower())
 
-        discovery = ProjectDiscovery(root=path, config=config)
-        context = discovery.discover_context()
-
         engine = AnalysisEngine(config=config)
-        result = engine.run(context)
+        result = engine.run(project.context)
 
         # Handle GitHub annotations & step summaries
         if github_annotations or ci_mode:
@@ -267,10 +263,9 @@ exclude = [
 )
 def dependency_cmd(path: Path) -> None:
     """Run dependency-focused checks only."""
-    discovery = ProjectDiscovery(root=path)
-    context = discovery.discover_context()
-    engine = AnalysisEngine(analyzers=[DependencyAnalyzer()])
-    result = engine.run(context)
+    project = load_project(path)
+    engine = AnalysisEngine(config=project.config, analyzers=[DependencyAnalyzer()])
+    result = engine.run(project.context)
     TerminalReporter(console=console).print_result(result)
     sys.exit(1 if result.has_blocking_errors else 0)
 
@@ -283,10 +278,9 @@ def dependency_cmd(path: Path) -> None:
 )
 def environment_cmd(path: Path) -> None:
     """Run environment and runtime drift checks only."""
-    discovery = ProjectDiscovery(root=path)
-    context = discovery.discover_context()
-    engine = AnalysisEngine(analyzers=[EnvironmentAnalyzer()])
-    result = engine.run(context)
+    project = load_project(path)
+    engine = AnalysisEngine(config=project.config, analyzers=[EnvironmentAnalyzer()])
+    result = engine.run(project.context)
     TerminalReporter(console=console).print_result(result)
     sys.exit(1 if result.has_blocking_errors else 0)
 
@@ -299,10 +293,9 @@ def environment_cmd(path: Path) -> None:
 )
 def architecture_cmd(path: Path) -> None:
     """Run AST and import architecture checks only."""
-    discovery = ProjectDiscovery(root=path)
-    context = discovery.discover_context()
-    engine = AnalysisEngine(analyzers=[ImportAnalyzer()])
-    result = engine.run(context)
+    project = load_project(path)
+    engine = AnalysisEngine(config=project.config, analyzers=[ImportAnalyzer()])
+    result = engine.run(project.context)
     TerminalReporter(console=console).print_result(result)
     sys.exit(1 if result.has_blocking_errors else 0)
 
@@ -347,22 +340,18 @@ def fix_cmd(
 ) -> None:
     """Safely and automatically fix detectable diagnostic health issues."""
     try:
-        pyproject_path = path / "pyproject.toml"
-        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
-        discovery = ProjectDiscovery(root=path, config=config)
-        context = discovery.discover_context()
-
+        project = load_project(path)
         engine = AnalysisEngine(
             analyzers=[
                 DependencyAnalyzer(),
                 EnvironmentAnalyzer(),
                 ImportAnalyzer(),
             ],
-            config=config,
+            config=project.config,
         )
-        scan_result = engine.run(context)
+        scan_result = engine.run(project.context)
 
-        remediation_engine = RemediationEngine(project_root=path)
+        remediation_engine = RemediationEngine(project_root=project.root)
         plan = remediation_engine.plan_fixes(scan_result, rule_filter=rule_filter)
 
         if not plan.actions:
@@ -490,12 +479,8 @@ def tree_cmd(
 ) -> None:
     """Visualize dependency trees and import architecture."""
     try:
-        pyproject_path = path / "pyproject.toml"
-        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
-        discovery = ProjectDiscovery(root=path, config=config)
-        context = discovery.discover_context()
-
-        visualizer = TreeVisualizer(context=context)
+        project = load_project(path)
+        visualizer = TreeVisualizer(context=project.context)
 
         if as_json:
             import json
@@ -582,10 +567,7 @@ def graph_cmd(
 def framework_cmd(path: Path, name: str | None, as_json: bool, as_sarif: bool) -> None:
     """Run framework-specific doctors (FastAPI, SQLAlchemy, Celery, Django)."""
     try:
-        pyproject_path = path / "pyproject.toml"
-        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
-        discovery = ProjectDiscovery(root=path, config=config)
-        context = discovery.discover_context()
+        project = load_project(path)
 
         # Select framework analyzers
         analyzers_to_run = []
@@ -606,8 +588,8 @@ def framework_cmd(path: Path, name: str | None, as_json: bool, as_sarif: bool) -
             )
             sys.exit(2)
 
-        engine = AnalysisEngine(config=config, analyzers=analyzers_to_run)
-        result = engine.run(context)
+        engine = AnalysisEngine(config=project.config, analyzers=analyzers_to_run)
+        result = engine.run(project.context)
 
         if as_json:
             reporter = JsonReporter()
@@ -657,16 +639,12 @@ def frameworks_cmd(
 def inspect_cmd(path: Path, offline: bool) -> None:
     """Launch interactive terminal dashboard (TUI) to explore diagnostics and fixes."""
     try:
-        pyproject_path = path / "pyproject.toml"
-        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
+        project = load_project(path)
         if offline:
-            config.offline = True
+            project.config.offline = True
 
-        discovery = ProjectDiscovery(root=path, config=config)
-        context = discovery.discover_context()
-
-        engine = AnalysisEngine(config=config)
-        result = engine.run(context)
+        engine = AnalysisEngine(config=project.config)
+        result = engine.run(project.context)
 
         explorer = TuiExplorer(result=result, console=console)
         explorer.run()

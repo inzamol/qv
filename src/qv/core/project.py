@@ -7,6 +7,7 @@ import configparser
 import importlib.metadata
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from packaging.requirements import Requirement
@@ -27,6 +28,40 @@ if sys.version_info >= (3, 11):
     import tomllib
 else:
     import tomli as tomllib
+
+
+@dataclass
+class Project:
+    """Encapsulates a loaded project's root path, configuration, and discovered context."""
+
+    root: Path
+    config: QvConfig
+    context: ProjectContext
+
+
+def load_project(
+    root: Path | str = ".",
+    config: QvConfig | None = None,
+) -> Project:
+    """Centralized loader for project root, configuration, and context discovery.
+
+    Guarantees that all CLI commands, analyzers, and engines consume the same
+    consistent project root, pyproject.toml configuration, suppressions, exclusions,
+    and discovered context.
+    """
+    project_root = Path(root).resolve()
+    if config is None:
+        pyproject_path = project_root / "pyproject.toml"
+        config = QvConfig.from_pyproject(pyproject_path if pyproject_path.exists() else None)
+
+    discovery = ProjectDiscovery(root=project_root, config=config)
+    context = discovery.discover_context()
+
+    return Project(
+        root=project_root,
+        config=config,
+        context=context,
+    )
 
 
 class ProjectDiscovery:
