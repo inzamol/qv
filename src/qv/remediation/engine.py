@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import re
 import shlex
 import subprocess
 from pathlib import Path
 
 import tomlkit
-from packaging.requirements import Requirement
-from packaging.utils import canonicalize_name
 
+from qv.core.config import canonicalize_dependency_name
 from qv.core.models import ScanResult
 from qv.remediation.models import FixAction, FixActionType, FixPlan, FixResult
 
@@ -20,33 +18,8 @@ def _get_canonical_package_name(spec: str) -> str | None:
 
     Returns None if the spec is a comment, flag, option, or non-package line.
     """
-    clean_spec = spec.strip()
-    if not clean_spec or clean_spec.startswith("#"):
-        return None
-
-    # Ignore pip options / flags (e.g. -r, -c, -f, --index-url, etc.) unless editable with egg
-    if clean_spec.startswith("-"):
-        if clean_spec.startswith("-e ") or clean_spec.startswith("--editable "):
-            egg_match = re.search(r"#egg=([\w\-_.]+)", clean_spec)
-            if egg_match:
-                return canonicalize_name(egg_match.group(1))
-        return None
-
-    # Strip inline comments
-    clean_no_comment = re.sub(r"\s+#.*$", "", clean_spec).strip()
-    # Strip pip line options (e.g. --hash=sha256:...)
-    clean_no_opts = re.sub(r"\s+--\S+.*$", "", clean_no_comment).strip()
-
-    if not clean_no_opts:
-        return None
-
-    try:
-        return canonicalize_name(Requirement(clean_no_opts).name)
-    except Exception:
-        match = re.match(r"^([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)", clean_no_opts)
-        if match:
-            return canonicalize_name(match.group(1))
-        return None
+    res = canonicalize_dependency_name(spec)
+    return res if res else None
 
 
 class RemediationEngine:
@@ -54,6 +27,35 @@ class RemediationEngine:
 
     def __init__(self, project_root: Path) -> None:
         self.root = project_root.resolve()
+
+    def _validate_target_path(self, target: Path | str) -> Path:
+        """Validate that target path securely resides within project root boundary.
+
+        Rejects parent directory traversal (../), external absolute paths,
+        and symlinks pointing outside the project root.
+        """
+        target_path = Path(target)
+        if not target_path.is_absolute():
+            candidate = self.root / target_path
+        else:
+            candidate = target_path
+
+        root_resolved = self.root.resolve()
+        resolved = candidate.resolve()
+
+        try:
+            resolved.relative_to(root_resolved)
+        except ValueError:
+            raise ValueError(
+                f"Remediation target path '{target}' resolves outside project root '{self.root}'."
+            ) from None
+
+        if resolved == root_resolved:
+            raise ValueError(
+                f"Remediation target path '{target}' cannot be the project root directory itself."
+            )
+
+        return resolved
 
     def plan_fixes(
         self,
@@ -202,8 +204,13 @@ class RemediationEngine:
             try:
                 if action.action_type == FixActionType.ADD_DEPENDENCY:
                     pkg = action.metadata.get("package")
-                    if pkg and action.target_file == "pyproject.toml":
-                        self._add_dependency_to_pyproject(pkg)
+                    if pkg and (
+                        action.target_file == "pyproject.toml"
+                        or (action.target_file and action.target_file.endswith(".toml"))
+                    ):
+                        self._add_dependency_to_pyproject(
+                            pkg, target_file=action.target_file or "pyproject.toml"
+                        )
                         result.applied.append(action)
                     elif pkg and action.target_file:
                         self._add_dependency_to_requirements(pkg, target_file=action.target_file)
@@ -213,8 +220,13 @@ class RemediationEngine:
 
                 elif action.action_type == FixActionType.REMOVE_DEPENDENCY:
                     pkg = action.metadata.get("package")
-                    if pkg and action.target_file == "pyproject.toml":
-                        self._remove_dependency_from_pyproject(pkg)
+                    if pkg and (
+                        action.target_file == "pyproject.toml"
+                        or (action.target_file and action.target_file.endswith(".toml"))
+                    ):
+                        self._remove_dependency_from_pyproject(
+                            pkg, target_file=action.target_file or "pyproject.toml"
+                        )
                         result.applied.append(action)
                     elif pkg and action.target_file:
                         self._remove_dependency_from_requirements(
@@ -226,7 +238,9 @@ class RemediationEngine:
 
                 elif action.action_type == FixActionType.UPDATE_METADATA:
                     proj_name = action.metadata.get("project_name", self.root.name)
-                    self._initialize_pyproject_metadata(proj_name)
+                    self._initialize_pyproject_metadata(
+                        proj_name, target_file=action.target_file or "pyproject.toml"
+                    )
                     result.applied.append(action)
 
                 elif action.action_type == FixActionType.EXECUTE_COMMAND:
@@ -243,9 +257,11 @@ class RemediationEngine:
 
         return result
 
-    def _add_dependency_to_pyproject(self, package: str) -> None:
+    def _add_dependency_to_pyproject(
+        self, package: str, target_file: str = "pyproject.toml"
+    ) -> None:
         """Add a dependency to pyproject.toml [project.dependencies]."""
-        pyproject_file = self.root / "pyproject.toml"
+        pyproject_file = self._validate_target_path(target_file)
 
         if not pyproject_file.exists():
             doc = tomlkit.document()
@@ -295,9 +311,11 @@ class RemediationEngine:
 
         pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
 
-    def _remove_dependency_from_pyproject(self, package: str) -> None:
+    def _remove_dependency_from_pyproject(
+        self, package: str, target_file: str = "pyproject.toml"
+    ) -> None:
         """Remove a dependency from pyproject.toml [project.dependencies]."""
-        pyproject_file = self.root / "pyproject.toml"
+        pyproject_file = self._validate_target_path(target_file)
         if not pyproject_file.exists():
             return
 
@@ -331,7 +349,7 @@ class RemediationEngine:
         self, package: str, target_file: str = "requirements.txt"
     ) -> None:
         """Add a dependency to a requirements file."""
-        req_file = self.root / target_file
+        req_file = self._validate_target_path(target_file)
         target_canonical = _get_canonical_package_name(package)
         if not target_canonical:
             return
@@ -356,7 +374,7 @@ class RemediationEngine:
         self, package: str, target_file: str = "requirements.txt"
     ) -> None:
         """Remove a dependency from a requirements file."""
-        req_file = self.root / target_file
+        req_file = self._validate_target_path(target_file)
         if not req_file.exists():
             return
 
@@ -373,9 +391,11 @@ class RemediationEngine:
 
         req_file.write_text("\n".join(filtered) + "\n" if filtered else "", encoding="utf-8")
 
-    def _initialize_pyproject_metadata(self, project_name: str) -> None:
+    def _initialize_pyproject_metadata(
+        self, project_name: str, target_file: str = "pyproject.toml"
+    ) -> None:
         """Initialize standard PEP 621 metadata in pyproject.toml."""
-        pyproject_file = self.root / "pyproject.toml"
+        pyproject_file = self._validate_target_path(target_file)
 
         if not pyproject_file.exists():
             doc = tomlkit.document()

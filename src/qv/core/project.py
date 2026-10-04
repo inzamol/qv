@@ -23,6 +23,7 @@ from qv.core.context import (
     PythonRuntime,
     SourceFile,
 )
+from qv.core.models import Diagnostic, Evidence, Severity, Suggestion
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -86,6 +87,7 @@ class ProjectDiscovery:
         manifest_files: list[Path] = []
         lock_files: list[Path] = []
         dependencies: list[DependencyDeclaration] = []
+        discovery_diagnostics: list[Diagnostic] = []
 
         # 1. Package manager detection & manifest parsing
         package_manager = "pip"
@@ -676,10 +678,56 @@ class ProjectDiscovery:
                                     resolved_module=resolved_mod,
                                 )
                             )
-                except SyntaxError:
-                    pass
-            except Exception:
-                pass
+                except SyntaxError as exc:
+                    rel_p = str(rel_path).replace("\\", "/")
+                    discovery_diagnostics.append(
+                        Diagnostic(
+                            id="DISC-002",
+                            severity=Severity.WARNING,
+                            category="discovery",
+                            title=f"Python syntax error in {py_path.name}",
+                            message=f"Syntax error parsing '{rel_p}' at line {exc.lineno}: {exc.msg}",
+                            file=rel_p,
+                            line=exc.lineno,
+                            column=exc.offset,
+                            evidence=[
+                                Evidence(
+                                    fact=f"SyntaxError: {exc.msg} in {rel_p}:{exc.lineno}",
+                                    source="ProjectDiscovery",
+                                )
+                            ],
+                            suggestions=[
+                                Suggestion(
+                                    description=f"Fix Python syntax error in '{rel_p}' at line {exc.lineno}.",
+                                    is_safe=False,
+                                )
+                            ],
+                        )
+                    )
+            except Exception as exc:
+                rel_p = str(rel_path).replace("\\", "/")
+                discovery_diagnostics.append(
+                    Diagnostic(
+                        id="DISC-001",
+                        severity=Severity.WARNING,
+                        category="discovery",
+                        title=f"Unreadable source file: {py_path.name}",
+                        message=f"Could not read source file '{rel_p}': {exc}",
+                        file=rel_p,
+                        evidence=[
+                            Evidence(
+                                fact=f"Failed to read file: {py_path} ({type(exc).__name__}: {exc})",
+                                source="ProjectDiscovery",
+                            )
+                        ],
+                        suggestions=[
+                            Suggestion(
+                                description=f"Check file permissions and encoding for '{rel_p}'.",
+                                is_safe=False,
+                            )
+                        ],
+                    )
+                )
 
         # 5. Docker discovery
         docker_config = self._discover_docker()
@@ -700,9 +748,11 @@ class ProjectDiscovery:
             imports=tuple(imports),
             docker=docker_config,
             ci=ci_config,
+            discovery_diagnostics=tuple(discovery_diagnostics),
             config={
                 "target_python": target_python,
                 "offline": self.config.offline,
+                "ignored_dependencies": self.config.ignored_dependencies,
             },
         )
 

@@ -20,6 +20,14 @@ class RuleDefinition:
     doc_url: str | None = None
 
 
+DOCS_BASE_URL: str = "https://inzamol.github.io/qv"
+
+
+def make_doc_url(slug: str) -> str:
+    """Construct canonical documentation URL for a rule anchor."""
+    return f"{DOCS_BASE_URL}/rules/#{slug}"
+
+
 # Stable Registry of rules as defined in docs/rules.md
 RULES_CATALOG: dict[str, RuleDefinition] = {
     # Dependency rules
@@ -30,7 +38,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Two or more declared or transitive dependencies have incompatible version constraints.",
         default_severity=Severity.ERROR,
         remediation_hint="Upgrade the conflicting package or loosen the version pin to satisfy all requirements.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-001--dependency-constraint-conflict",
+        doc_url=make_doc_url("11-dep-001-dependency-constraint-conflict"),
     ),
     "DEP-002": RuleDefinition(
         id="DEP-002",
@@ -39,16 +47,16 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="A third-party package is imported in source code but is not declared in project dependencies.",
         default_severity=Severity.ERROR,
         remediation_hint="Add the missing package to your pyproject.toml or requirements.txt.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-002--missing-dependency-declaration",
+        doc_url=make_doc_url("12-dep-002-missing-dependency-declaration"),
     ),
     "DEP-003": RuleDefinition(
         id="DEP-003",
         category="dependency",
         title="No direct import detected",
-        description="A package is declared as a direct dependency, but no direct imports were detected across project source files.",
+        description="A package is declared as a direct dependency, but no direct imports were detected across project source files. This detects the absence of a detected direct import, not proof that the dependency is unused. Dependencies may still be required at runtime through plugins, configuration, framework integration, CLI entrypoints, or indirect mechanisms.",
         default_severity=Severity.WARNING,
-        remediation_hint="Verify if this dependency is used dynamically, required as a plugin/driver, or can be safely removed.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-003--no-direct-import-detected",
+        remediation_hint="Verify if this dependency is used dynamically, required as a plugin/driver/runtime configuration, or can be safely removed.",
+        doc_url=make_doc_url("13-dep-003-no-direct-import-detected"),
     ),
     "DEP-004": RuleDefinition(
         id="DEP-004",
@@ -57,7 +65,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="A package requires a Python version incompatible with the target project runtime.",
         default_severity=Severity.WARNING,
         remediation_hint="Update your target Python version or install a version of the package compatible with your Python runtime.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-004--python-compatibility-mismatch",
+        doc_url=make_doc_url("14-dep-004-python-compatibility-mismatch"),
     ),
     "DEP-005": RuleDefinition(
         id="DEP-005",
@@ -66,7 +74,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="The package version installed in the virtualenv does not match the pinned requirement in project declaration.",
         default_severity=Severity.WARNING,
         remediation_hint="Sync your virtual environment using your package manager (e.g. `uv sync` or `poetry install`).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-005--installeddeclaration-mismatch",
+        doc_url=make_doc_url("15-dep-005-installeddeclaration-mismatch"),
     ),
     "DEP-006": RuleDefinition(
         id="DEP-006",
@@ -75,7 +83,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="A security vulnerability has been identified in a direct or transitive dependency.",
         default_severity=Severity.ERROR,
         remediation_hint="Update the vulnerable dependency or apply vendor security patches.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-006--vulnerable-transitive-dependency",
+        doc_url=make_doc_url("16-dep-006-vulnerable-transitive-dependency"),
     ),
     # Security rules
     "SEC-001": RuleDefinition(
@@ -85,7 +93,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="The advisory database (OSV.dev) could not be reached to perform vulnerability checks.",
         default_severity=Severity.WARNING,
         remediation_hint="Check your internet connection or run with --offline to skip security checks.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sec-001--security-analysis-unavailable",
+        doc_url=make_doc_url("21-sec-001-security-analysis-unavailable"),
     ),
     # Environment rules
     "ENV-001": RuleDefinition(
@@ -95,7 +103,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="The active Python interpreter version differs from the project's target runtime specification.",
         default_severity=Severity.WARNING,
         remediation_hint="Ensure the virtual environment is built using the configured target Python version.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#env-001--python-version-drift",
+        doc_url=make_doc_url("31-env-001-python-version-drift"),
     ),
     "ENV-002": RuleDefinition(
         id="ENV-002",
@@ -104,7 +112,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="The Python version in Dockerfile/docker-compose differs from the project's target runtime.",
         default_severity=Severity.WARNING,
         remediation_hint="Update the base image tag in your Dockerfile to match your project's target Python version.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#env-002--docker-runtime-drift",
+        doc_url=make_doc_url("32-env-002-docker-runtime-drift"),
     ),
     "ENV-003": RuleDefinition(
         id="ENV-003",
@@ -113,7 +121,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="CI workflow test matrix does not cover or differs from declared project Python versions.",
         default_severity=Severity.WARNING,
         remediation_hint="Align your CI matrix with the Python versions specified in pyproject.toml.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#env-003--ci-runtime-drift",
+        doc_url=make_doc_url("33-env-003-ci-runtime-drift"),
     ),
     # Import / Architecture rules
     "IMP-001": RuleDefinition(
@@ -123,7 +131,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="An import cycle exists between two or more modules, which may cause runtime initialization errors.",
         default_severity=Severity.ERROR,
         remediation_hint="Refactor shared dependencies into a separate module or use deferred/lazy imports.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#imp-001--circular-import-detected",
+        doc_url=make_doc_url("41-imp-001-circular-import-detected"),
     ),
     "IMP-002": RuleDefinition(
         id="IMP-002",
@@ -132,7 +140,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="A local module imported in source code could not be resolved on the project's Python path.",
         default_severity=Severity.ERROR,
         remediation_hint="Verify the module name and ensure source directory is marked on the PYTHONPATH or package root.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#imp-002--unresolved-local-import",
+        doc_url=make_doc_url("42-imp-002-unresolved-local-import"),
     ),
     "IMP-003": RuleDefinition(
         id="IMP-003",
@@ -141,7 +149,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="A Python source file exists in the project but is never imported or referenced by any other module, entry point, or test file.",
         default_severity=Severity.WARNING,
         remediation_hint="Review if this module is obsolete and can be safely deleted or integrated into your package exports.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#imp-003--unused-orphan-local-module",
+        doc_url=make_doc_url("43-imp-003-unused-orphan-local-module"),
     ),
     "IMP-004": RuleDefinition(
         id="IMP-004",
@@ -150,7 +158,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="A standard library module imported in source code was deprecated or completely removed in modern Python (PEP 594).",
         default_severity=Severity.ERROR,
         remediation_hint="Replace the removed stdlib module with its modern replacement (e.g. importlib instead of imp, subprocess instead of pipes).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#imp-004--deprecated-or-removed-standard-library-module",
+        doc_url=make_doc_url("44-imp-004-deprecated-or-removed-standard-library-module"),
     ),
     # Packaging rules
     "PKG-001": RuleDefinition(
@@ -160,7 +168,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Essential packaging metadata (such as project name, version, or description) is missing.",
         default_severity=Severity.WARNING,
         remediation_hint="Provide project name and version in pyproject.toml [project] table.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#pkg-001--missing-package-metadata",
+        doc_url=make_doc_url("51-pkg-001-missing-package-metadata"),
     ),
     "PKG-002": RuleDefinition(
         id="PKG-002",
@@ -169,7 +177,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="The project configuration file contains syntax errors or invalid keys.",
         default_severity=Severity.ERROR,
         remediation_hint="Fix configuration syntax to conform to PEP 621 / tool specifications.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#pkg-002--invalid-project-configuration",
+        doc_url=make_doc_url("52-pkg-002-invalid-project-configuration"),
     ),
     # FastAPI Framework rules (FAP-xxx)
     "FAP-001": RuleDefinition(
@@ -179,7 +187,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Synchronous blocking operations (e.g. time.sleep, requests, subprocess, synchronous DB queries) or CPU-bound hashing called inside an async def FastAPI route handler block the asyncio event loop.",
         default_severity=Severity.ERROR,
         remediation_hint="Use non-blocking async alternatives (e.g. asyncio.sleep, httpx.AsyncClient) or run blocking/CPU calls in worker threads via anyio.to_thread.run_sync or fastapi.concurrency.run_in_threadpool.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-001--blocking-call-or-cpu-bound-operation-in-async-endpoint",
+        doc_url=make_doc_url("61-fap-001-blocking-call-or-cpu-bound-operation-in-async-endpoint"),
     ),
     "FAP-002": RuleDefinition(
         id="FAP-002",
@@ -188,7 +196,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="An async route handler depends on a dependency (via Depends) that executes blocking synchronous I/O or CPU operations.",
         default_severity=Severity.WARNING,
         remediation_hint="Refactor dependency to use async operations or execute in a worker threadpool.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-002--blocking-dependency-in-async-path",
+        doc_url=make_doc_url("62-fap-002-blocking-dependency-in-async-path"),
     ),
     "FAP-003": RuleDefinition(
         id="FAP-003",
@@ -197,7 +205,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="FastAPI route endpoint does not declare a response_model argument or return type annotation, disabling schema validation and response serialization.",
         default_severity=Severity.WARNING,
         remediation_hint="Add a return type annotation (-> ResponseModel) or pass response_model to the route decorator.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-003--missing-response-model-or-return-type-annotation",
+        doc_url=make_doc_url("63-fap-003-missing-response-model-or-return-type-annotation"),
     ),
     "FAP-004": RuleDefinition(
         id="FAP-004",
@@ -206,7 +214,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="CORSMiddleware configured with allow_origins=['*'] and allow_credentials=True, or FastAPI instantiated with debug=True.",
         default_severity=Severity.ERROR,
         remediation_hint="Specify explicit trusted origins in allow_origins when credentials are enabled, and disable debug mode in production.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-004--insecure-cors-or-debug-configuration",
+        doc_url=make_doc_url("64-fap-004-insecure-cors-or-debug-configuration"),
     ),
     "FAP-005": RuleDefinition(
         id="FAP-005",
@@ -215,7 +223,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="HTTP client (such as httpx.AsyncClient, httpx.Client, or aiohttp.ClientSession) instantiated without an explicit timeout.",
         default_severity=Severity.WARNING,
         remediation_hint="Configure an explicit timeout (e.g. timeout=10.0) to prevent hanging connections.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-005--missing-http-client-timeout-configuration",
+        doc_url=make_doc_url("65-fap-005-missing-http-client-timeout-configuration"),
     ),
     "FAP-006": RuleDefinition(
         id="FAP-006",
@@ -224,7 +232,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="A path parameter defined in the route URL template (e.g. '/users/{user_id}') does not match any parameter in the handler function signature.",
         default_severity=Severity.ERROR,
         remediation_hint="Ensure all {param} placeholders in route URL decorators match parameter names in the endpoint function signature.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-006--route-path-parameter-template-mismatch",
+        doc_url=make_doc_url("66-fap-006-route-path-parameter-template-mismatch"),
     ),
     "FAP-007": RuleDefinition(
         id="FAP-007",
@@ -233,7 +241,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="A generator dependency using yield does not wrap cleanup code in a try...finally block, causing resource and connection leaks on exceptions.",
         default_severity=Severity.WARNING,
         remediation_hint="Wrap the yield and teardown logic in a try...finally block to guarantee resource cleanup.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-007--unsafe-yield-dependency-without-tryfinally",
+        doc_url=make_doc_url("67-fap-007-unsafe-yield-dependency-without-tryfinally"),
     ),
     "FAP-008": RuleDefinition(
         id="FAP-008",
@@ -242,7 +250,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Using deprecated @app.on_event('startup' / 'shutdown') handlers instead of modern lifespan context managers.",
         default_severity=Severity.WARNING,
         remediation_hint="Migrate @app.on_event to '@asynccontextmanager async def lifespan(app: FastAPI)' and pass to FastAPI(lifespan=lifespan).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-008--deprecated-apponevent-lifecycle-hook",
+        doc_url=make_doc_url("68-fap-008-deprecated-appon_event-lifecycle-hook"),
     ),
     "FAP-009": RuleDefinition(
         id="FAP-009",
@@ -251,7 +259,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Route handler accepts a raw 'dict', 'Any', or untyped Body parameter instead of a Pydantic model, bypassing automatic request validation.",
         default_severity=Severity.WARNING,
         remediation_hint="Define a Pydantic BaseModel schema for the request payload to ensure type safety and validation.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-009--untyped-or-unvalidated-request-body",
+        doc_url=make_doc_url("69-fap-009-untyped-or-unvalidated-request-body"),
     ),
     "FAP-010": RuleDefinition(
         id="FAP-010",
@@ -260,7 +268,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Multiple route handlers are registered with the identical HTTP method and path on the same app/router, causing one to shadow the other.",
         default_severity=Severity.ERROR,
         remediation_hint="Ensure all routes have unique method and path combinations, or combine related logic into a single handler.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-010--shadowed-or-duplicate-route-endpoint",
+        doc_url=make_doc_url("610-fap-010-shadowed-or-duplicate-route-endpoint"),
     ),
     "FAP-011": RuleDefinition(
         id="FAP-011",
@@ -269,7 +277,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Route handler uses a mutable default argument (e.g. list or dict), which can leak state across concurrent requests.",
         default_severity=Severity.WARNING,
         remediation_hint="Use None as default (e.g. filters: list[str] | None = None) or use Field(default_factory=list).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-011--mutable-default-value-in-route-parameter",
+        doc_url=make_doc_url("611-fap-011-mutable-default-value-in-route-parameter"),
     ),
     "FAP-012": RuleDefinition(
         id="FAP-012",
@@ -278,7 +286,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Custom @app.exception_handler function does not take the required (request, exc) parameters, causing runtime crashes.",
         default_severity=Severity.ERROR,
         remediation_hint="Ensure custom exception handlers accept exactly two parameters: '(request: Request, exc: Exception)'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-012--invalid-exception-handler-signature",
+        doc_url=make_doc_url("612-fap-012-invalid-exception-handler-signature"),
     ),
     "FAP-013": RuleDefinition(
         id="FAP-013",
@@ -287,7 +295,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Spawning raw asyncio.create_task inside route handlers without background task management can cause lost exceptions and unhandled crashes.",
         default_severity=Severity.WARNING,
         remediation_hint="Use FastAPI's built-in BackgroundTasks ('background_tasks.add_task(...)') for request-scoped background jobs.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-013--untracked-asynciocreatetask-in-route-handler",
+        doc_url=make_doc_url("613-fap-013-untracked-asynciocreate_task-in-route-handler"),
     ),
     "FAP-014": RuleDefinition(
         id="FAP-014",
@@ -296,7 +304,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="FileResponse initialized directly with an unvalidated path variable from route parameters, risking arbitrary file read vulnerabilities.",
         default_severity=Severity.WARNING,
         remediation_hint="Validate and resolve the file path against a trusted base directory before passing to FileResponse.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-014--potential-path-traversal-in-fileresponse",
+        doc_url=make_doc_url("614-fap-014-potential-path-traversal-in-fileresponse"),
     ),
     "FAP-015": RuleDefinition(
         id="FAP-015",
@@ -305,7 +313,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Using synchronous open() or blocking file read/write operations inside an async def route handler blocks the event loop.",
         default_severity=Severity.ERROR,
         remediation_hint="Use 'aiofiles', 'anyio.Path', or run file I/O in a synchronous def route handler.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-015--blocking-file-io-in-async-endpoint",
+        doc_url=make_doc_url("615-fap-015-blocking-file-io-in-async-endpoint"),
     ),
     "FAP-016": RuleDefinition(
         id="FAP-016",
@@ -314,7 +322,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Pydantic model schema exposes sensitive password/secret fields without Field(exclude=True) or response filtering.",
         default_severity=Severity.ERROR,
         remediation_hint="Mark sensitive fields with 'Field(exclude=True)' or create a separate output schema (e.g. UserResponse).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-016--sensitive-field-exposure-in-schema",
+        doc_url=make_doc_url("616-fap-016-sensitive-field-exposure-in-schema"),
     ),
     "FAP-017": RuleDefinition(
         id="FAP-017",
@@ -323,7 +331,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Mutation routes (POST/DELETE) return default 200 OK instead of standard REST status codes (201 Created or 204 No Content).",
         default_severity=Severity.WARNING,
         remediation_hint="Specify status_code=status.HTTP_201_CREATED on POST routes or status.HTTP_204_NO_CONTENT on DELETE routes.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-017--non-standard-http-status-code-on-post-or-delete",
+        doc_url=make_doc_url("617-fap-017-non-standard-http-status-code-on-post-or-delete"),
     ),
     "FAP-018": RuleDefinition(
         id="FAP-018",
@@ -332,7 +340,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Route handler mutates global/module-level collections or variables without synchronization locks, causing concurrency bugs.",
         default_severity=Severity.ERROR,
         remediation_hint="Use a proper database, Redis cache, or an asyncio.Lock for shared state.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-018--global-in-memory-state-mutation-in-route-handler",
+        doc_url=make_doc_url("618-fap-018-global-in-memory-state-mutation-in-route-handler"),
     ),
     "FAP-019": RuleDefinition(
         id="FAP-019",
@@ -341,7 +349,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="response.set_cookie() called without httponly=True or secure=True flags, exposing cookies to XSS or network interception.",
         default_severity=Severity.ERROR,
         remediation_hint="Set 'httponly=True' and 'secure=True' when storing sensitive session or auth cookies.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-019--insecure-cookie-configuration",
+        doc_url=make_doc_url("619-fap-019-insecure-cookie-configuration"),
     ),
     "FAP-020": RuleDefinition(
         id="FAP-020",
@@ -350,7 +358,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="RedirectResponse initialized directly with user-supplied URL parameter without domain whitelist validation.",
         default_severity=Severity.WARNING,
         remediation_hint="Validate that the redirect target is a relative path or matches an allowed domain whitelist.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-020--potential-open-redirect-in-redirectresponse",
+        doc_url=make_doc_url("620-fap-020-potential-open-redirect-in-redirectresponse"),
     ),
     "FAP-021": RuleDefinition(
         id="FAP-021",
@@ -359,7 +367,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="app.include_router() called without 'tags' or 'prefix', leading to unorganized OpenAPI documentation and URL clashes.",
         default_severity=Severity.WARNING,
         remediation_hint="Provide 'prefix' and 'tags' when including routers (e.g. app.include_router(user_router, prefix='/users', tags=['Users'])).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-021--router-included-without-tags-or-prefix",
+        doc_url=make_doc_url("621-fap-021-router-included-without-tags-or-prefix"),
     ),
     "FAP-022": RuleDefinition(
         id="FAP-022",
@@ -368,7 +376,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="WebSocket endpoint sends or receives data before calling 'await websocket.accept()', which causes runtime errors.",
         default_severity=Severity.ERROR,
         remediation_hint="Call 'await websocket.accept()' before reading or writing data to the WebSocket.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-022--websocket-route-missing-await-websocketaccept",
+        doc_url=make_doc_url("622-fap-022-websocket-route-missing-await-websocketaccept"),
     ),
     "FAP-023": RuleDefinition(
         id="FAP-023",
@@ -377,7 +385,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Pydantic schema uses deprecated inner 'class Config:' instead of Pydantic v2 'model_config = ConfigDict(...)'.",
         default_severity=Severity.WARNING,
         remediation_hint="Migrate inner 'class Config:' to 'model_config = ConfigDict(...)'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-023--deprecated-pydantic-v1-config-class",
+        doc_url=make_doc_url("623-fap-023-deprecated-pydantic-v1-config-class"),
     ),
     "FAP-024": RuleDefinition(
         id="FAP-024",
@@ -386,7 +394,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Route handler declares multiple parameters resolving the exact same dependency callable.",
         default_severity=Severity.WARNING,
         remediation_hint="Consolidate duplicate dependencies into a single parameter.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-024--redundant-duplicate-dependency-declaration",
+        doc_url=make_doc_url("624-fap-024-redundant-duplicate-dependency-declaration"),
     ),
     "FAP-025": RuleDefinition(
         id="FAP-025",
@@ -395,7 +403,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Returning an HTTPException instance in a route handler returns a 200 OK HTTP response with the serialized exception object instead of raising an error.",
         default_severity=Severity.ERROR,
         remediation_hint="Use 'raise HTTPException(...)' instead of 'return HTTPException(...)'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-025--returned-httpexception-instance-instead-of-raise",
+        doc_url=make_doc_url("625-fap-025-returned-httpexception-instance-instead-of-raise"),
     ),
     "FAP-026": RuleDefinition(
         id="FAP-026",
@@ -404,7 +412,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Using deprecated Pydantic v1 '@validator' or '@root_validator' decorators instead of Pydantic v2 '@field_validator' or '@model_validator'.",
         default_severity=Severity.WARNING,
         remediation_hint="Migrate to '@field_validator' or '@model_validator' from pydantic.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-026--deprecated-pydantic-v1-validator-or-rootvalidator",
+        doc_url=make_doc_url("626-fap-026-deprecated-pydantic-v1-validator-or-root_validator"),
     ),
     "FAP-027": RuleDefinition(
         id="FAP-027",
@@ -413,7 +421,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Route parameter initialized with 'Depends(...)', 'Query(...)', or 'Path(...)' does not specify a type annotation, disabling FastAPI schema generation and static type checking.",
         default_severity=Severity.WARNING,
         remediation_hint="Add explicit type annotation: 'param: Type = Depends(...)' or 'param: Annotated[Type, Depends(...)]'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-027--dependency-parameter-missing-type-annotation",
+        doc_url=make_doc_url("627-fap-027-dependency-parameter-missing-type-annotation"),
     ),
     "FAP-028": RuleDefinition(
         id="FAP-028",
@@ -422,7 +430,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Calling 'json.loads(await request.body())' or 'json.loads(request.body)' is an anti-pattern; FastAPI and Starlette provide an optimized built-in 'await request.json()' method.",
         default_severity=Severity.WARNING,
         remediation_hint="Replace 'json.loads(await request.body())' with 'await request.json()'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-028--raw-jsonloads-called-on-request-body",
+        doc_url=make_doc_url("628-fap-028-raw-jsonloads-called-on-request-body"),
     ),
     "FAP-029": RuleDefinition(
         id="FAP-029",
@@ -431,7 +439,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Instantiating StreamingResponse without specifying 'media_type' can cause clients to misinterpret the streamed content format.",
         default_severity=Severity.WARNING,
         remediation_hint="Pass an explicit media_type argument (e.g. StreamingResponse(stream, media_type='application/json')).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-029--streamingresponse-initialized-without-mediatype",
+        doc_url=make_doc_url("629-fap-029-streamingresponse-initialized-without-media_type"),
     ),
     "FAP-030": RuleDefinition(
         id="FAP-030",
@@ -440,7 +448,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Public route endpoint does not provide a docstring, 'summary', or 'description', resulting in sparse and incomplete OpenAPI documentation.",
         default_severity=Severity.WARNING,
         remediation_hint="Add a function docstring or pass 'summary=...' in the route decorator.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-030--missing-route-summary-or-docstring-for-openapi-documentation",
+        doc_url=make_doc_url(
+            "630-fap-030-missing-route-summary-or-docstring-for-openapi-documentation"
+        ),
     ),
     "FAP-031": RuleDefinition(
         id="FAP-031",
@@ -449,7 +459,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="FastAPI strongly recommends using standard typing.Annotated[Type, Depends(...)] instead of parameter default values for cleaner typing and reusable dependencies.",
         default_severity=Severity.INFO,
         remediation_hint="Refactor parameter to 'param: Annotated[Type, Depends(...)]' or 'param: Annotated[Type, Query(...)]'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-031--prefer-typingannotated-over-parameter-default-assignment",
+        doc_url=make_doc_url(
+            "631-fap-031-prefer-typingannotated-over-parameter-default-assignment"
+        ),
     ),
     "FAP-032": RuleDefinition(
         id="FAP-032",
@@ -458,7 +470,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Calling jsonable_encoder() inside a route handler that already declares response_model causes double serialization, reducing throughput.",
         default_severity=Severity.WARNING,
         remediation_hint="Return raw objects or dicts directly and let FastAPI's response_model handle serialization.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-032--redundant-jsonableencoder-with-responsemodel",
+        doc_url=make_doc_url("632-fap-032-redundant-jsonable_encoder-with-response_model"),
     ),
     "FAP-033": RuleDefinition(
         id="FAP-033",
@@ -467,7 +479,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Pydantic response model for ORM/database objects is missing 'model_config = ConfigDict(from_attributes=True)', causing validation failures when serializing ORM instances.",
         default_severity=Severity.WARNING,
         remediation_hint="Add 'model_config = ConfigDict(from_attributes=True)' to the Pydantic schema.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-033--missing-fromattributestrue-in-orm-response-schema",
+        doc_url=make_doc_url("633-fap-033-missing-from_attributestrue-in-orm-response-schema"),
     ),
     "FAP-034": RuleDefinition(
         id="FAP-034",
@@ -476,7 +488,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Calling request.json() or request.body() without 'await' inside an async def route handler assigns an un-awaited coroutine instead of parsed data.",
         default_severity=Severity.ERROR,
         remediation_hint="Add 'await' before 'request.json()' or 'request.body()'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-034--missing-await-on-requestjson-or-requestbody",
+        doc_url=make_doc_url("634-fap-034-missing-await-on-requestjson-or-requestbody"),
     ),
     "FAP-035": RuleDefinition(
         id="FAP-035",
@@ -485,7 +497,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Raising generic Exception, ValueError, or RuntimeError in route handlers triggers uncaught 500 Internal Server Errors instead of structured REST HTTP error responses.",
         default_severity=Severity.WARNING,
         remediation_hint="Raise 'HTTPException(status_code=..., detail=...)' for predictable API client error responses.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-035--raw-exception-raised-instead-of-httpexception",
+        doc_url=make_doc_url("635-fap-035-raw-exception-raised-instead-of-httpexception"),
     ),
     "FAP-036": RuleDefinition(
         id="FAP-036",
@@ -494,7 +506,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Mutating request.app.state or app.state inside per-request route handlers introduces concurrency race conditions. Application state should be initialized in lifespan context managers.",
         default_severity=Severity.WARNING,
         remediation_hint="Initialize shared state in the lifespan context manager before startup rather than modifying app.state in route handlers.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-036--mutating-appstate-inside-route-handler",
+        doc_url=make_doc_url("636-fap-036-mutating-appstate-inside-route-handler"),
     ),
     "FAP-037": RuleDefinition(
         id="FAP-037",
@@ -503,7 +515,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="SecurityScopes parameter declared in a dependency using Depends(...) will not receive requested scopes. Use Security(dependency, scopes=[...]) instead.",
         default_severity=Severity.WARNING,
         remediation_hint="Use 'Security(dependency, scopes=[...])' when protecting endpoints with OAuth2 SecurityScopes.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-037--securityscopes-declared-with-depends-instead-of-security",
+        doc_url=make_doc_url(
+            "637-fap-037-securityscopes-declared-with-depends-instead-of-security"
+        ),
     ),
     "FAP-038": RuleDefinition(
         id="FAP-038",
@@ -512,7 +526,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Using integer literals for status_code (e.g. status_code=201) reduces readability compared to named constants like status.HTTP_201_CREATED.",
         default_severity=Severity.INFO,
         remediation_hint="Import status from fastapi (or HTTPStatus from http) and use named constants (e.g. status.HTTP_201_CREATED).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#fap-038--hardcoded-http-status-code-integer",
+        doc_url=make_doc_url("638-fap-038-hardcoded-http-status-code-integer"),
     ),
     # SQLAlchemy & SQL Framework rules (SQL-xxx)
     "SQL-001": RuleDefinition(
@@ -522,7 +536,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Executing database queries (session.execute, session.query, session.get, or select()) inside for/while loops causes N+1 performance degradation.",
         default_severity=Severity.WARNING,
         remediation_hint="Batch query objects using 'select(...).where(Model.id.in_(ids))' or eager relationship options (e.g. joinedload/selectinload).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-001--potential-n1-database-query-in-loop",
+        doc_url=make_doc_url("71-sql-001-potential-n1-database-query-in-loop"),
     ),
     "SQL-002": RuleDefinition(
         id="SQL-002",
@@ -531,7 +545,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Instantiating a Session without a with-statement context manager or try...finally session.close() causes database connection pool exhaustion.",
         default_severity=Severity.WARNING,
         remediation_hint="Use 'with SessionLocal() as session:' or wrap session lifecycle in a context manager / dependency yield.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-002--session-instantiated-without-context-manager-or-cleanup",
+        doc_url=make_doc_url("72-sql-002-session-instantiated-without-context-manager-or-cleanup"),
     ),
     "SQL-003": RuleDefinition(
         id="SQL-003",
@@ -540,7 +554,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Invoking synchronous database engine calls or synchronous session operations inside an async def function blocks the asyncio event loop.",
         default_severity=Severity.ERROR,
         remediation_hint="Use SQLAlchemy async extension ('create_async_engine' and 'AsyncSession') with async drivers (e.g. asyncpg, aiosqlite).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-003--synchronous-db-operation-in-async-event-loop",
+        doc_url=make_doc_url("73-sql-003-synchronous-db-operation-in-async-event-loop"),
     ),
     "SQL-004": RuleDefinition(
         id="SQL-004",
@@ -549,7 +563,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Constructing SQL queries using f-strings or string formatting with text() or cursor.execute() introduces severe SQL injection vulnerabilities.",
         default_severity=Severity.ERROR,
         remediation_hint="Use bound query parameters with text('SELECT ... WHERE id = :id'), {'id': user_val}.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-004--raw-sql-string-interpolation-sql-injection-risk",
+        doc_url=make_doc_url("74-sql-004-raw-sql-string-interpolation-sql-injection-risk"),
     ),
     "SQL-005": RuleDefinition(
         id="SQL-005",
@@ -558,7 +572,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Using legacy session.query(...) instead of modern SQLAlchemy 2.0 select() and session.scalars().",
         default_severity=Severity.WARNING,
         remediation_hint="Migrate from 'session.query(User).filter(...)' to 'session.scalars(select(User).where(...))'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-005--legacy-sqlalchemy-1x-sessionquery-syntax",
+        doc_url=make_doc_url("75-sql-005-legacy-sqlalchemy-1x-sessionquery-syntax"),
     ),
     "SQL-006": RuleDefinition(
         id="SQL-006",
@@ -567,7 +581,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Accessing lazy-loaded ORM relationships without explicit joinedload/selectinload in async sessions triggers MissingGreenlet errors.",
         default_severity=Severity.WARNING,
         remediation_hint="Specify 'options(selectinload(Model.relation))' or set lazy='selectin' on relationship definition.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-006--missing-relationship-eager-loading-strategy-in-async-session",
+        doc_url=make_doc_url(
+            "76-sql-006-missing-relationship-eager-loading-strategy-in-async-session"
+        ),
     ),
     "SQL-007": RuleDefinition(
         id="SQL-007",
@@ -576,7 +592,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Session performs mutations (session.add / session.delete) but never executes session.commit() or enters a transaction with session.begin().",
         default_severity=Severity.WARNING,
         remediation_hint="Ensure mutations are committed with 'await session.commit()' or executed inside 'with session.begin():'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-007--uncommitted-transaction-in-mutation-function",
+        doc_url=make_doc_url("77-sql-007-uncommitted-transaction-in-mutation-function"),
     ),
     "SQL-008": RuleDefinition(
         id="SQL-008",
@@ -585,7 +601,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Creating a database engine without 'pool_pre_ping=True' can lead to runtime disconnect errors when idle connections are closed by firewalls/servers.",
         default_severity=Severity.WARNING,
         remediation_hint="Add 'pool_pre_ping=True' to create_engine() / create_async_engine().",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-008--createengine-missing-poolpreping-connection-health-check",
+        doc_url=make_doc_url(
+            "78-sql-008-create_engine-missing-pool_pre_ping-connection-health-check"
+        ),
     ),
     "SQL-009": RuleDefinition(
         id="SQL-009",
@@ -594,7 +612,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Configuring AsyncSession or async_sessionmaker with expire_on_commit=True (the default) causes MissingGreenlet exceptions when accessing committed model attributes.",
         default_severity=Severity.WARNING,
         remediation_hint="Set 'expire_on_commit=False' when instantiating AsyncSession or async_sessionmaker.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-009--expireoncommittrue-in-asyncsession",
+        doc_url=make_doc_url("79-sql-009-expire_on_committrue-in-asyncsession"),
     ),
     "SQL-010": RuleDefinition(
         id="SQL-010",
@@ -603,7 +621,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Database URL contains plain-text passwords or secret credentials in source code instead of loading from environment variables.",
         default_severity=Severity.ERROR,
         remediation_hint="Read database connection strings from environment variables (e.g. os.getenv('DATABASE_URL')).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-010--hardcoded-database-credentials-in-connection-url",
+        doc_url=make_doc_url("710-sql-010-hardcoded-database-credentials-in-connection-url"),
     ),
     "SQL-011": RuleDefinition(
         id="SQL-011",
@@ -612,7 +630,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Calling .all() on queries against database tables without limit() or pagination clauses risks memory exhaustion on large datasets.",
         default_severity=Severity.WARNING,
         remediation_hint="Add '.limit(limit)' and pagination parameters to query statements.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-011--unbounded-select-query-without-limit-or-pagination",
+        doc_url=make_doc_url("711-sql-011-unbounded-select-query-without-limit-or-pagination"),
     ),
     "SQL-012": RuleDefinition(
         id="SQL-012",
@@ -621,7 +639,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Configuring relationship cascade='all, delete-orphan' without database-level ondelete='CASCADE' on ForeignKey forces slow Python-side row-by-row deletion.",
         default_severity=Severity.INFO,
         remediation_hint="Add ondelete='CASCADE' to ForeignKey and passive_deletes=True to relationship for database-level cascading.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-012--relationship-cascade-delete-without-foreignkey-ondelete-cascade",
+        doc_url=make_doc_url(
+            "712-sql-012-relationship-cascade-delete-without-foreignkey-ondelete-cascade"
+        ),
     ),
     "SQL-013": RuleDefinition(
         id="SQL-013",
@@ -630,7 +650,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Calling session.flush() or session.commit() inside loops creates high database roundtrip overhead. Use bulk insert or single commit after loop.",
         default_severity=Severity.WARNING,
         remediation_hint="Move session.commit() outside the loop or use session.execute(insert(Model), batch_data).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-013--session-flush-or-commit-called-inside-loop",
+        doc_url=make_doc_url("713-sql-013-session-flush-or-commit-called-inside-loop"),
     ),
     "SQL-014": RuleDefinition(
         id="SQL-014",
@@ -639,7 +659,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Using legacy declarative_base() instead of modern SQLAlchemy 2.0 class Base(DeclarativeBase): pass.",
         default_severity=Severity.WARNING,
         remediation_hint="Define 'class Base(DeclarativeBase): pass' from sqlalchemy.orm.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-014--deprecated-declarativebase-function",
+        doc_url=make_doc_url("714-sql-014-deprecated-declarative_base-function"),
     ),
     "SQL-015": RuleDefinition(
         id="SQL-015",
@@ -648,7 +668,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="SQLite engine initialized without connect_args={'check_same_thread': False} can cause ProgrammingError in multi-threaded web applications.",
         default_severity=Severity.WARNING,
         remediation_hint="Pass connect_args={'check_same_thread': False} to create_engine() when using SQLite in web applications.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-015--sqlite-engine-missing-checksamethreadfalse-in-multi-threaded-application",
+        doc_url=make_doc_url(
+            "715-sql-015-sqlite-engine-missing-check_same_threadfalse-in-multi-threaded-application"
+        ),
     ),
     "SQL-016": RuleDefinition(
         id="SQL-016",
@@ -657,7 +679,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="SQLAlchemy database models are defined in the project, but no Alembic migrations directory or alembic.ini configuration exists.",
         default_severity=Severity.INFO,
         remediation_hint="Initialize database migrations using 'alembic init alembic'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-016--missing-database-migration-configuration-alembic",
+        doc_url=make_doc_url("716-sql-016-missing-database-migration-configuration-alembic"),
     ),
     "SQL-017": RuleDefinition(
         id="SQL-017",
@@ -666,7 +688,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Using legacy Column() or raw field assignment with Mapped[...] type annotations instead of SQLAlchemy 2.0's native mapped_column().",
         default_severity=Severity.WARNING,
         remediation_hint="Replace 'col: Mapped[int] = Column(Integer)' with 'col: Mapped[int] = mapped_column()'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-017--mapped-attribute-missing-mappedcolumn-in-20-declarative-model",
+        doc_url=make_doc_url(
+            "717-sql-017-mapped-attribute-missing-mapped_column-in-20-declarative-model"
+        ),
     ),
     "SQL-018": RuleDefinition(
         id="SQL-018",
@@ -675,7 +699,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="create_engine configured with pool_size or max_overflow > 50 in a single instance, risking database connection exhaustion.",
         default_severity=Severity.WARNING,
         remediation_hint="Keep pool_size between 5 and 20 per instance and use external connection poolers (e.g. pgBouncer) for scaling.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-018--excessive-connection-pool-size-in-single-application-instance",
+        doc_url=make_doc_url(
+            "718-sql-018-excessive-connection-pool-size-in-single-application-instance"
+        ),
     ),
     "SQL-019": RuleDefinition(
         id="SQL-019",
@@ -684,7 +710,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Using NullPool in persistent web servers disables connection pooling and creates high latency TCP connection overhead on every request.",
         default_severity=Severity.WARNING,
         remediation_hint="Use default QueuePool or AsyncAdaptedQueuePool for persistent web applications; reserve NullPool for AWS Lambda/serverless.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-019--nullpool-configured-in-persistent-web-application",
+        doc_url=make_doc_url("719-sql-019-nullpool-configured-in-persistent-web-application"),
     ),
     "SQL-020": RuleDefinition(
         id="SQL-020",
@@ -693,7 +719,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Declarative ORM model defined without at least one primary key column (primary_key=True), which will cause runtime ORM mapping failures.",
         default_severity=Severity.ERROR,
         remediation_hint="Define at least one column with 'primary_key=True' or 'mapped_column(primary_key=True)'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-020--declarative-orm-model-missing-primary-key-definition",
+        doc_url=make_doc_url("720-sql-020-declarative-orm-model-missing-primary-key-definition"),
     ),
     "SQL-021": RuleDefinition(
         id="SQL-021",
@@ -702,7 +728,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Catching exceptions around database queries/mutations without invoking session.rollback() leaves the session in an unusable invalid state.",
         default_severity=Severity.WARNING,
         remediation_hint="Add 'session.rollback()' in exception handlers or use 'with session.begin():' for automatic rollback on error.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-021--missing-sessionrollback-in-database-exception-handler",
+        doc_url=make_doc_url("721-sql-021-missing-sessionrollback-in-database-exception-handler"),
     ),
     "SQL-022": RuleDefinition(
         id="SQL-022",
@@ -711,7 +737,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Model includes LargeBinary or Large Text column without deferred() loading, causing heavy memory consumption during full-table selects.",
         default_severity=Severity.INFO,
         remediation_hint="Wrap large blob/text columns with 'deferred(Column(LargeBinary))' or use select(Model).options(load_only(...)).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-022--large-binary-or-heavy-text-column-without-deferredloadonly-strategy",
+        doc_url=make_doc_url(
+            "722-sql-022-large-binary-or-heavy-text-column-without-deferredload_only-strategy"
+        ),
     ),
     "SQL-023": RuleDefinition(
         id="SQL-023",
@@ -720,7 +748,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="ForeignKey column created without index=True, causing expensive sequential scans during joins, foreign key lookups, and cascade operations.",
         default_severity=Severity.WARNING,
         remediation_hint="Add 'index=True' to ForeignKey column definitions (e.g. Column(Integer, ForeignKey('users.id'), index=True)).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-023--foreignkey-column-defined-without-indextrue",
+        doc_url=make_doc_url("723-sql-023-foreignkey-column-defined-without-indextrue"),
     ),
     "SQL-024": RuleDefinition(
         id="SQL-024",
@@ -729,7 +757,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Remote database connection URL targeting external hosts does not specify sslmode=require or ssl=true.",
         default_severity=Severity.WARNING,
         remediation_hint="Append '?sslmode=require' (PostgreSQL) or '?ssl=true' to production database connection strings.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-024--insecure-unencrypted-remote-database-connection-url",
+        doc_url=make_doc_url("724-sql-024-insecure-unencrypted-remote-database-connection-url"),
     ),
     "SQL-025": RuleDefinition(
         id="SQL-025",
@@ -738,7 +766,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Calling engine.execute() or engine.scalar() directly is removed in SQLAlchemy 2.0.",
         default_severity=Severity.ERROR,
         remediation_hint="Use explicit connection contexts: 'with engine.connect() as conn: result = conn.execute(stmt)'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-025--deprecated-engineexecute-or-enginescalar-direct-call",
+        doc_url=make_doc_url("725-sql-025-deprecated-engineexecute-or-enginescalar-direct-call"),
     ),
     "SQL-026": RuleDefinition(
         id="SQL-026",
@@ -747,7 +775,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="AsyncSession created without 'async with' context manager or explicit 'await session.close()', causing connection leaks in async tasks.",
         default_severity=Severity.WARNING,
         remediation_hint="Use 'async with AsyncSessionLocal() as session:' or ensure 'await session.close()' in a finally block.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-026--asyncsession-instantiated-without-async-context-manager-or-await-close",
+        doc_url=make_doc_url(
+            "726-sql-026-asyncsession-instantiated-without-async-context-manager-or-await-close"
+        ),
     ),
     "SQL-027": RuleDefinition(
         id="SQL-027",
@@ -756,7 +786,9 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Querying a record and updating numeric counters or balance fields without row-level locking (with_for_update()) causes lost update race conditions.",
         default_severity=Severity.WARNING,
         remediation_hint="Lock rows with 'select(...).with_for_update()' or use atomic SQL increments 'update(Account).values(balance=Account.balance - amt)'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-027--unsafe-concurrent-numeric-balance-or-counter-update-without-withforupdate",
+        doc_url=make_doc_url(
+            "727-sql-027-unsafe-concurrent-numeric-balance-or-counter-update-without-with_for_update"
+        ),
     ),
     "SQL-028": RuleDefinition(
         id="SQL-028",
@@ -765,7 +797,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Using thread-local scoped_session in async applications causes session sharing across coroutines and race conditions.",
         default_severity=Severity.ERROR,
         remediation_hint="Use async_scoped_session(..., scopefunc=asyncio.current_task) or dependency injection per request.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-028--thread-local-scopedsession-used-in-async-context",
+        doc_url=make_doc_url("728-sql-028-thread-local-scoped_session-used-in-async-context"),
     ),
     "SQL-029": RuleDefinition(
         id="SQL-029",
@@ -774,7 +806,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Declarative model inheriting from Base/DeclarativeBase does not define __tablename__ or __table__, causing mapping errors.",
         default_severity=Severity.ERROR,
         remediation_hint="Define '__tablename__ = \"table_name\"' on concrete ORM classes (or set '__abstract__ = True' for mixins).",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-029--declarative-orm-model-missing-tablename-definition",
+        doc_url=make_doc_url("729-sql-029-declarative-orm-model-missing-tablename-definition"),
     ),
     "SQL-030": RuleDefinition(
         id="SQL-030",
@@ -783,7 +815,7 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="Calling engine.raw_connection() bypasses connection pool management and leaks connections if not closed explicitly.",
         default_severity=Severity.WARNING,
         remediation_hint="Always close raw DBAPI connections in a try...finally block: 'raw_conn = engine.raw_connection(); try: ... finally: raw_conn.close()'.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#sql-030--direct-dbapi-rawconnection-used-without-cleanup",
+        doc_url=make_doc_url("730-sql-030-direct-dbapi-raw_connection-used-without-cleanup"),
     ),
     # Engine execution rules
     "ENG-001": RuleDefinition(
@@ -793,7 +825,26 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         description="An analyzer raised an unexpected exception during execution.",
         default_severity=Severity.ERROR,
         remediation_hint="Check the error message or report a bug to the analyzer maintainer.",
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#eng-001--analyzer-execution-failed",
+        doc_url=make_doc_url("81-eng-001-analyzer-execution-failed"),
+    ),
+    # Project discovery rules
+    "DISC-001": RuleDefinition(
+        id="DISC-001",
+        category="discovery",
+        title="Unreadable source file",
+        description="A source file could not be read during project discovery due to permissions or encoding errors.",
+        default_severity=Severity.WARNING,
+        remediation_hint="Check file read permissions and ensure file is encoded in valid UTF-8.",
+        doc_url=make_doc_url("91-disc-001-unreadable-source-file"),
+    ),
+    "DISC-002": RuleDefinition(
+        id="DISC-002",
+        category="discovery",
+        title="Python syntax error in source file",
+        description="A Python source file contains invalid syntax and could not be parsed into an AST.",
+        default_severity=Severity.WARNING,
+        remediation_hint="Fix the syntax error in the source file.",
+        doc_url=make_doc_url("92-disc-002-python-syntax-error-in-source-file"),
     ),
 }
 

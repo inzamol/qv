@@ -51,14 +51,25 @@ You can adjust how strictly any rule is treated:
 
 ---
 
-## 3. Ignore Rules
+## 3. Ignore Rules and Dependencies
 
-To suppress rules that are not applicable to your workflow, list them under `[tool.qv.ignore]`:
+### 3.1 Ignore Rules Globally
+To suppress specific diagnostic rule IDs that are not applicable to your workflow, list them under `[tool.qv.ignore]`:
 
 ```toml
 [tool.qv.ignore]
 rules = ["DEP-003", "ENV-002"]
 ```
+
+### 3.2 Ignore Specific Packages (DEP-003)
+To ignore specific packages from unused dependency checks (`DEP-003`) (e.g. dynamic plugins, CLI drivers, or runtime dependencies), configure `[tool.qv.dependencies]`:
+
+```toml
+[tool.qv.dependencies]
+ignore = ["amqp", "psycopg2-binary", "gunicorn"]
+```
+
+Package names are automatically normalized, case-insensitive, and support version specifiers (e.g. `amqp>=1.0` or `amqp[extra]`). Ignoring a package only suppresses `DEP-003` for that package while keeping all other rules active.
 
 ---
 

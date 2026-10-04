@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from qv.core.models import Diagnostic
 
 
 @dataclass(frozen=True)
@@ -105,4 +108,5 @@ class ProjectContext:
     imports: tuple[ImportRecord, ...]
     docker: DockerConfig
     ci: CIConfig
+    discovery_diagnostics: tuple[Diagnostic, ...] = ()
     config: dict[str, Any] = field(default_factory=dict)

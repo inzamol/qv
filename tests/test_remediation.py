@@ -572,3 +572,104 @@ line-length = 100
     assert "[project]" in content
     assert "[tool.ruff]" in content
     assert "line-length = 100" in content
+
+
+def test_valid_project_file_is_allowed(tmp_path: Path):
+    """AC-01: Valid files within project root boundary must be allowed."""
+    engine = RemediationEngine(project_root=tmp_path)
+
+    # Validate relative file within project
+    resolved = engine._validate_target_path("requirements.txt")
+    assert resolved == (tmp_path / "requirements.txt").resolve()
+
+    # Validate nested file within project
+    sub_dir = tmp_path / "nested"
+    sub_dir.mkdir()
+    resolved_sub = engine._validate_target_path("nested/deps.txt")
+    assert resolved_sub == (sub_dir / "deps.txt").resolve()
+
+    # Writing to valid requirements file succeeds
+    engine._add_dependency_to_requirements("httpx", target_file="requirements.txt")
+    assert "httpx" in (tmp_path / "requirements.txt").read_text(encoding="utf-8")
+
+
+def test_parent_directory_traversal_is_rejected(tmp_path: Path):
+    """AC-01: Parent directory traversal (../) escaping project root must be rejected."""
+    import pytest
+
+    engine = RemediationEngine(project_root=tmp_path)
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._validate_target_path("../outside.txt")
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._validate_target_path("nested/../../outside.txt")
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._add_dependency_to_requirements("httpx", target_file="../outside_reqs.txt")
+
+
+def test_absolute_external_path_is_rejected(tmp_path: Path):
+    """AC-01: Absolute paths outside the project root must be rejected."""
+    import pytest
+
+    engine = RemediationEngine(project_root=tmp_path)
+    external_path = tmp_path.parent / "external_reqs.txt"
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._validate_target_path(str(external_path))
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._add_dependency_to_requirements("httpx", target_file=str(external_path))
+
+
+def test_symlink_outside_project_is_rejected(tmp_path: Path):
+    """AC-01: Symlinks resolving outside the project root must be rejected."""
+    import os
+
+    import pytest
+
+    engine = RemediationEngine(project_root=tmp_path)
+    external_target = tmp_path.parent / "secret_file.txt"
+    external_target.write_text("secret\n", encoding="utf-8")
+
+    symlink_path = tmp_path / "symlink_file.txt"
+    try:
+        os.symlink(external_target, symlink_path)
+    except OSError:
+        pytest.skip("Symlink creation not supported in this environment")
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._validate_target_path("symlink_file.txt")
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._add_dependency_to_requirements("httpx", target_file="symlink_file.txt")
+
+
+def test_dep003_remediation_safety_amqp_regression(tmp_path: Path):
+    """AC-05: DEP-003 must never automatically remove 'amqp' when running remediation workflow."""
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """[project]
+name = "amqp-demo"
+version = "0.1.0"
+dependencies = [
+    "amqp",
+]
+""",
+        encoding="utf-8",
+    )
+    # Source file has no direct import of amqp
+    main_py = tmp_path / "main.py"
+    main_py.write_text("print('hello')\n", encoding="utf-8")
+
+    runner = CliRunner()
+    # Execute non-interactive remediation (qv fix -y)
+    result = runner.invoke(cli, ["fix", str(tmp_path), "-y"])
+    assert result.exit_code == 0
+
+    # Ensure amqp was NOT automatically removed
+    updated_toml = pyproject.read_text(encoding="utf-8")
+    assert '"amqp"' in updated_toml
+    assert "Skipped 1 action(s)" in result.output
+    assert "requires review" in result.output

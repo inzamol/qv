@@ -19,7 +19,7 @@ def test_html_reporter_generates_valid_html(tmp_path: Path):
         line=10,
         evidence=[Evidence(fact="Imported 'httpx' at app/main.py:10", source="app/main.py")],
         suggestions=[Suggestion(description="Add 'httpx' to dependencies", command="uv add httpx")],
-        doc_url="https://github.com/inzamol/qv/blob/main/docs/rules.md#dep-002",
+        doc_url="https://inzamol.github.io/qv/rules/#dep-002",
     )
 
     result = ScanResult.create(

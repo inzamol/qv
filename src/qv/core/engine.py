@@ -50,7 +50,7 @@ class AnalysisEngine:
 
     def run(self, context: ProjectContext) -> ScanResult:
         """Run all registered analyzers against the given ProjectContext."""
-        raw_diagnostics: list[Diagnostic] = []
+        raw_diagnostics: list[Diagnostic] = list(getattr(context, "discovery_diagnostics", ()))
         analyzer_results: list[AnalyzerExecutionResult] = []
         checks_evaluated = 0
 

@@ -55,9 +55,13 @@ qv scan [PATH] [OPTIONS]
 | `--ci` | Runs non-interactively with strict mode enabled |
 | `--json` | Emits scan results as structured JSON |
 | `--sarif` | Emits scan results as standard SARIF v2.1.0 format |
+| `--format`, `-f <FORMAT>` | Specify output format (`json`, `sarif`, `html`, `terminal`, `text`) |
 | `--html <FILE>` | Generates an interactive, standalone HTML dashboard |
 | `--github-annotations` | Emits GitHub Actions inline PR workflow annotations |
 | `--offline` | Disables remote vulnerability/CVE queries (airgapped mode) |
+| `--hide-warnings`, `-W` | Suppresses warning diagnostics from terminal output |
+| `--errors-only`, `-E` | Only shows blocking error diagnostics (hides warnings and info) |
+| `--severity <LEVEL>` | Filter findings by minimum severity (`error`, `warning`, `info`) |
 | `--output`, `-o <FILE>` | Writes output directly to a file |
 
 ### 3.3 Exit Codes
@@ -95,7 +99,7 @@ qv ui [PATH] [OPTIONS]
 
 ## 5. `qv fix`
 
-Safely and automatically fixes detectable diagnostic health issues (e.g., adding missing dependencies to `pyproject.toml`, removing unused dependencies, initializing packaging metadata).
+Safely and deterministically fixes detectable diagnostic health issues (e.g., adding missing dependencies to `pyproject.toml`, creating default configuration schemas, and initializing packaging metadata). Note that unused dependency removals (`DEP-003`) are marked for manual review to prevent accidental deletion of runtime plugins.
 
 ```bash
 qv fix [PATH] [OPTIONS]

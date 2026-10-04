@@ -98,6 +98,14 @@ def cli() -> None:
     type=click.Choice(["error", "warning", "info"], case_sensitive=False),
     help="Filter findings by minimum severity level.",
 )
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["json", "sarif", "html", "terminal", "text"], case_sensitive=False),
+    default=None,
+    help="Output format (json, sarif, html, terminal, text).",
+)
 def scan(
     path: Path,
     strict: bool,
@@ -111,8 +119,18 @@ def scan(
     hide_warnings: bool = False,
     errors_only: bool = False,
     min_severity: str | None = None,
+    output_format: str | None = None,
 ) -> None:
     """Scan a Python project and report health findings."""
+    if output_format:
+        fmt = output_format.lower()
+        if fmt == "json":
+            as_json = True
+        elif fmt == "sarif":
+            as_sarif = True
+        elif fmt == "html" and not html_output:
+            # If user ran --format html without --html, default to writing report.html or stdout
+            pass
     try:
         project = load_project(path)
         config = project.config

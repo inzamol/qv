@@ -8,6 +8,7 @@ from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
+from qv.core.config import canonicalize_dependency_name
 from qv.core.context import ProjectContext
 from qv.core.models import Diagnostic, Evidence, Severity, Suggestion
 from qv.rules.registry import get_rule_definition
@@ -296,6 +297,9 @@ class DependencyAnalyzer:
         if not rule:
             return diagnostics
 
+        declared_canonical_names = {
+            canonicalize_dependency_name(d.name): d for d in context.dependencies
+        }
         declared_names = {d.name.lower().replace("-", "_"): d for d in context.dependencies}
         declared_raw_names = {d.name.lower(): d for d in context.dependencies}
 
@@ -330,6 +334,8 @@ class DependencyAnalyzer:
             mapped_pkg = KNOWN_IMPORT_TO_PKG.get(top_level.lower(), top_level.lower()).replace(
                 "-", "_"
             )
+            top_level_canon = canonicalize_dependency_name(top_level)
+            mapped_pkg_canon = canonicalize_dependency_name(mapped_pkg)
 
             if (
                 top_level in STDLIB_MODULES
@@ -339,6 +345,8 @@ class DependencyAnalyzer:
                 or top_level.lower() in declared_raw_names
                 or mapped_pkg in declared_names
                 or mapped_pkg in declared_raw_names
+                or (top_level_canon and top_level_canon in declared_canonical_names)
+                or (mapped_pkg_canon and mapped_pkg_canon in declared_canonical_names)
             ):
                 continue
 
@@ -447,6 +455,10 @@ class DependencyAnalyzer:
         if not rule or not context.source_files:
             return diagnostics
 
+        ignored_dependencies = set(context.config.get("ignored_dependencies", set()))
+        ignored_unused_canonical = {canonicalize_dependency_name(x) for x in IGNORED_UNUSED}
+
+        imported_canonical_names: set[str] = set()
         imported_top_levels: set[str] = set()
         for imp in context.imports:
             mod_to_check = (
@@ -457,24 +469,52 @@ class DependencyAnalyzer:
             if mod_to_check:
                 top = mod_to_check.split(".")[0].lower().replace("-", "_")
                 imported_top_levels.add(top)
+                top_canon = canonicalize_dependency_name(top)
+                if top_canon:
+                    imported_canonical_names.add(top_canon)
                 if top in KNOWN_IMPORT_TO_PKG:
                     imported_top_levels.add(KNOWN_IMPORT_TO_PKG[top].lower().replace("-", "_"))
+                    pkg_canon = canonicalize_dependency_name(KNOWN_IMPORT_TO_PKG[top])
+                    if pkg_canon:
+                        imported_canonical_names.add(pkg_canon)
             for sym in imp.imported_symbols:
                 imported_top_levels.add(sym.lower().replace("-", "_"))
+                sym_canon = canonicalize_dependency_name(sym)
+                if sym_canon:
+                    imported_canonical_names.add(sym_canon)
                 if sym.lower() in KNOWN_IMPORT_TO_PKG:
                     imported_top_levels.add(
                         KNOWN_IMPORT_TO_PKG[sym.lower()].lower().replace("-", "_")
                     )
+                    pkg_canon = canonicalize_dependency_name(KNOWN_IMPORT_TO_PKG[sym.lower()])
+                    if pkg_canon:
+                        imported_canonical_names.add(pkg_canon)
 
         for dep in context.dependencies:
             if dep.is_dev:
                 continue
 
-            dep_norm = dep.name.lower().replace("-", "_")
-            if dep.name.lower() in IGNORED_UNUSED or dep_norm in IGNORED_UNUSED:
+            dep_canon = canonicalize_dependency_name(dep.name)
+            if not dep_canon:
                 continue
 
-            if dep_norm not in imported_top_levels and dep.name.lower() not in imported_top_levels:
+            # Support per-package dependency ignore (AC-02)
+            if dep_canon in ignored_dependencies:
+                continue
+
+            dep_norm = dep.name.lower().replace("-", "_")
+            if (
+                dep.name.lower() in IGNORED_UNUSED
+                or dep_norm in IGNORED_UNUSED
+                or dep_canon in ignored_unused_canonical
+            ):
+                continue
+
+            if (
+                dep_canon not in imported_canonical_names
+                and dep_norm not in imported_top_levels
+                and dep.name.lower() not in imported_top_levels
+            ):
                 diag = Diagnostic(
                     id=rule.id,
                     severity=rule.default_severity,

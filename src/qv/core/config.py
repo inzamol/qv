@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -17,6 +21,36 @@ from qv.core.models import Severity
 
 class ConfigurationError(Exception):
     """Raised when a configuration file cannot be parsed or contains invalid settings."""
+
+
+def canonicalize_dependency_name(spec: str) -> str:
+    """Extract canonical package name from requirement specification string or requirements.txt line."""
+    clean_spec = spec.strip()
+    if not clean_spec or clean_spec.startswith("#"):
+        return ""
+
+    if clean_spec.startswith("-"):
+        if clean_spec.startswith("-e ") or clean_spec.startswith("--editable "):
+            egg_match = re.search(r"#egg=([\w\-_.]+)", clean_spec)
+            if egg_match:
+                return canonicalize_name(egg_match.group(1))
+        return ""
+
+    # Strip inline comments
+    clean_no_comment = re.sub(r"\s+#.*$", "", clean_spec).strip()
+    # Strip pip line options (e.g. --hash=sha256:...)
+    clean_no_opts = re.sub(r"\s+--\S+.*$", "", clean_no_comment).strip()
+
+    if not clean_no_opts:
+        return ""
+
+    try:
+        return canonicalize_name(Requirement(clean_no_opts).name)
+    except Exception:
+        match = re.match(r"^([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)", clean_no_opts)
+        if match:
+            return canonicalize_name(match.group(1))
+        return canonicalize_name(clean_no_opts)
 
 
 @dataclass
@@ -54,6 +88,7 @@ class QvConfig:
 
     rules: dict[str, RuleConfig] = field(default_factory=dict)
     ignored_rules: set[str] = field(default_factory=set)
+    ignored_dependencies: set[str] = field(default_factory=set)
     paths: PathConfig = field(default_factory=PathConfig)
     target_python: str | None = None
     strict: bool = False
@@ -158,6 +193,28 @@ class QvConfig:
                         )
                     ignored_rules.add(r.strip())
 
+        ignored_dependencies: set[str] = set()
+        dep_config = tool_config.get("dependencies")
+        if dep_config is not None:
+            if not isinstance(dep_config, dict):
+                raise ConfigurationError(
+                    f"Invalid [tool.qv.dependencies] in '{pyproject_path}': expected a table"
+                )
+            ignore_list = dep_config.get("ignore")
+            if ignore_list is not None:
+                if not isinstance(ignore_list, (list, tuple, set)):
+                    raise ConfigurationError(
+                        f"Invalid [tool.qv.dependencies.ignore] in '{pyproject_path}': expected a list of package names"
+                    )
+                for item in ignore_list:
+                    if not isinstance(item, str):
+                        raise ConfigurationError(
+                            f"Invalid package in [tool.qv.dependencies.ignore] in '{pyproject_path}': expected string"
+                        )
+                    canon = canonicalize_dependency_name(item)
+                    if canon:
+                        ignored_dependencies.add(canon)
+
         paths_dict = tool_config.get("paths")
         if paths_dict is not None and not isinstance(paths_dict, dict):
             raise ConfigurationError(
@@ -224,6 +281,7 @@ class QvConfig:
         return cls(
             rules=rules,
             ignored_rules=ignored_rules,
+            ignored_dependencies=ignored_dependencies,
             paths=paths,
             target_python=target_python,
             offline=offline,

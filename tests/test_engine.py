@@ -290,3 +290,170 @@ def test_reported_check_counts_with_filtered_warnings(tmp_path: Path):
 
     # Checks passed must still only be 1 (DEP-004), since DEP-003 failed during analysis
     assert result.summary.checks_passed == 1
+
+
+def test_check_counts_all_rules_pass(tmp_path: Path):
+    """AC-09 Case 1: When all evaluated rules pass, checks_passed equals total enabled rules."""
+    context = create_sample_context(tmp_path)
+
+    class AllPassAnalyzer(Analyzer):
+        id = "PASS-001"
+        name = "AllPassAnalyzer"
+        description = "Test analyzer where all rules pass"
+        rules = ("RULE-1", "RULE-2", "RULE-3")
+
+        def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+            return []
+
+    engine = AnalysisEngine(config=QvConfig(), analyzers=[AllPassAnalyzer()])
+    result = engine.run(context)
+    assert result.summary.checks_passed == 3
+    assert result.summary.errors_count == 0
+    assert result.summary.warnings_count == 0
+
+
+def test_check_counts_one_rule_multiple_diagnostics(tmp_path: Path):
+    """AC-09 Case 2: When one rule produces multiple diagnostics, it only counts as 1 failed rule."""
+    context = create_sample_context(tmp_path)
+
+    class MultiDiagAnalyzer(Analyzer):
+        id = "MULTI-001"
+        name = "MultiDiagAnalyzer"
+        description = "Test analyzer producing multiple diagnostics per rule"
+        rules = ("DEP-001", "DEP-002", "DEP-003")
+
+        def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+            # DEP-002 produces 3 separate diagnostics
+            return [
+                Diagnostic(
+                    id="DEP-002",
+                    severity=Severity.ERROR,
+                    category="dependency",
+                    title="Missing pkg1",
+                    message="pkg1 missing",
+                ),
+                Diagnostic(
+                    id="DEP-002",
+                    severity=Severity.ERROR,
+                    category="dependency",
+                    title="Missing pkg2",
+                    message="pkg2 missing",
+                ),
+                Diagnostic(
+                    id="DEP-002",
+                    severity=Severity.ERROR,
+                    category="dependency",
+                    title="Missing pkg3",
+                    message="pkg3 missing",
+                ),
+            ]
+
+    engine = AnalysisEngine(config=QvConfig(), analyzers=[MultiDiagAnalyzer()])
+    result = engine.run(context)
+
+    # Total evaluated rules: 3 (DEP-001, DEP-002, DEP-003)
+    # Failed rules: 1 (DEP-002)
+    # Passed checks: 2 (DEP-001, DEP-003)
+    assert result.summary.checks_passed == 2
+    assert result.summary.errors_count == 3
+    assert len(result.diagnostics) == 3
+
+
+def test_check_counts_rule_disabled_and_ignored(tmp_path: Path):
+    """AC-09 Cases 3 & 4: Disabled and ignored rules do not count as passed or failed."""
+    context = create_sample_context(tmp_path)
+
+    class ThreeRuleAnalyzer(Analyzer):
+        id = "THREE-001"
+        name = "ThreeRuleAnalyzer"
+        description = "Test analyzer with three rules"
+        rules = ("RULE-A", "RULE-B", "RULE-C")
+
+        def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+            return []
+
+    # Disable RULE-A and ignore RULE-B
+    from qv.core.config import RuleConfig
+
+    config = QvConfig(
+        rules={"RULE-A": RuleConfig(disabled=True)},
+        ignored_rules={"RULE-B"},
+    )
+    engine = AnalysisEngine(config=config, analyzers=[ThreeRuleAnalyzer()])
+    result = engine.run(context)
+
+    # Only RULE-C is evaluated and passed
+    assert result.summary.checks_passed == 1
+
+
+def test_check_counts_analyzer_failure_does_not_count_as_passed(tmp_path: Path):
+    """AC-09 Case 5 & AC-08: A failed analyzer's rules are not counted as passed, and failure is visible."""
+    context = create_sample_context(tmp_path)
+
+    class FailingAnalyzer(Analyzer):
+        id = "FAIL-001"
+        name = "FailingAnalyzer"
+        description = "Test failing analyzer"
+        rules = ("RULE-X", "RULE-Y")
+
+        def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+            raise RuntimeError("test failure")
+
+    class SiblingAnalyzer(Analyzer):
+        id = "SIB-001"
+        name = "SiblingAnalyzer"
+        description = "Test sibling analyzer"
+        rules = ("RULE-Z",)
+
+        def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+            return []
+
+    engine = AnalysisEngine(config=QvConfig(), analyzers=[FailingAnalyzer(), SiblingAnalyzer()])
+    result = engine.run(context)
+
+    # FailingAnalyzer status = FAILED
+    failed_ar = next(r for r in result.analyzer_results if r.analyzer_name == "FailingAnalyzer")
+    assert failed_ar.status == AnalyzerStatus.FAILED
+
+    # SiblingAnalyzer still continued and passed
+    sib_ar = next(r for r in result.analyzer_results if r.analyzer_name == "SiblingAnalyzer")
+    assert sib_ar.status == AnalyzerStatus.OK
+
+    # ENG-001 diagnostic exists
+    assert any(d.id == "ENG-001" for d in result.diagnostics)
+    # Scan did not silently pass
+    assert result.has_blocking_errors is True
+
+    # Checks passed only includes RULE-Z from SiblingAnalyzer (RULE-X and RULE-Y from failed analyzer are NOT passed)
+    assert result.summary.checks_passed == 1
+
+
+def test_check_counts_severity_filtering(tmp_path: Path):
+    """AC-09 Case 6: Severity filtering removes diagnostic from display but rule is not counted as passed."""
+    context = create_sample_context(tmp_path)
+
+    class WarnAnalyzer(Analyzer):
+        id = "WARN-001"
+        name = "WarnAnalyzer"
+        description = "Test warning analyzer"
+        rules = ("RULE-W", "RULE-P")
+
+        def analyze(self, context: ProjectContext) -> list[Diagnostic]:
+            return [
+                Diagnostic(
+                    id="RULE-W",
+                    severity=Severity.WARNING,
+                    category="test",
+                    title="Warn finding",
+                    message="Warn",
+                )
+            ]
+
+    # Filter by min_severity = ERROR (removes RULE-W warning)
+    config = QvConfig(min_severity=Severity.ERROR)
+    engine = AnalysisEngine(config=config, analyzers=[WarnAnalyzer()])
+    result = engine.run(context)
+
+    assert len(result.diagnostics) == 0
+    # RULE-P passed (1 check), RULE-W was not passed
+    assert result.summary.checks_passed == 1
