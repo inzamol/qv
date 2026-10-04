@@ -61,6 +61,7 @@ dependencies = []
     result = runner.invoke(cli, ["scan", str(tmp_path), "--sarif"])
     assert result.exit_code in (0, 1)
     assert '"version": "2.1.0"' in result.output
+    assert f'"semanticVersion": "{__version__}"' in result.output
 
 
 def test_cli_framework_command(tmp_path):

@@ -2,6 +2,7 @@
 
 import json
 
+from qv import __version__
 from qv.core.models import Diagnostic, ScanResult, Severity
 from qv.reporters.json_reporter import JsonReporter
 from qv.reporters.sarif import SarifReporter
@@ -44,5 +45,11 @@ def test_reporters():
     sarif_str = sarif_rep.render(result)
     sarif_data = json.loads(sarif_str)
     assert sarif_data["version"] == "2.1.0"
+    assert sarif_data["runs"][0]["tool"]["driver"]["name"] == "qv"
+    assert sarif_data["runs"][0]["tool"]["driver"]["semanticVersion"] == __version__
     assert len(sarif_data["runs"][0]["results"]) == 1
     assert sarif_data["runs"][0]["results"][0]["ruleId"] == "DEP-001"
+
+    # 4. SARIF reporter with explicit version
+    custom_sarif = SarifReporter(tool_version="2.0.0").to_sarif_dict(result)
+    assert custom_sarif["runs"][0]["tool"]["driver"]["semanticVersion"] == "2.0.0"
