@@ -304,3 +304,121 @@ def test_remediation_shell_metacharacters_not_interpreted(tmp_path: Path, monkey
     assert len(recorded_calls) == 1
     assert recorded_calls[0]["shell"] is False
     assert recorded_calls[0]["cmd"] == ["pip", "install", malicious_arg]
+
+
+def test_remediation_toml_structure_preservation_issue_5(tmp_path: Path):
+    """Test Issue #5: Modifying dependencies in [project] does not corrupt [tool.some-tool]."""
+    pyproject = tmp_path / "pyproject.toml"
+    initial_content = """# Main project configuration
+[project]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+    "requests",
+]
+
+# Custom tool table with its own dependencies
+[tool.some-tool]
+dependencies = [
+    "internal-package",
+]
+"""
+    pyproject.write_text(initial_content, encoding="utf-8")
+
+    engine = RemediationEngine(project_root=tmp_path)
+
+    # 1. Add a dependency 'httpx'
+    scan_add = ScanResult(
+        project_name="demo",
+        project_path=str(tmp_path),
+        python_version="3.12.0",
+        package_manager="uv",
+        summary=ScanSummary(errors_count=1),
+        diagnostics=[
+            Diagnostic(
+                id="DEP-002",
+                severity=Severity.ERROR,
+                category="dependency",
+                title="Missing dependency",
+                message="Package httpx is missing",
+                affected_packages=["httpx"],
+            )
+        ],
+    )
+    plan_add = engine.plan_fixes(scan_add)
+    result_add = engine.apply_plan(plan_add)
+    assert result_add.success
+
+    updated = pyproject.read_text(encoding="utf-8")
+    # Verify [project] dependencies updated
+    assert '"httpx"' in updated
+    assert '"requests"' in updated
+    # Verify [tool.some-tool] dependencies kept untouched
+    assert '"internal-package"' in updated
+    assert "[tool.some-tool]" in updated
+
+    # 2. Remove 'requests' from [project]
+    scan_remove = ScanResult(
+        project_name="demo",
+        project_path=str(tmp_path),
+        python_version="3.12.0",
+        package_manager="uv",
+        summary=ScanSummary(warnings_count=1),
+        diagnostics=[
+            Diagnostic(
+                id="DEP-003",
+                severity=Severity.WARNING,
+                category="dependency",
+                title="Unused dependency",
+                message="Package requests is unused",
+                affected_packages=["requests"],
+            )
+        ],
+    )
+    plan_remove = engine.plan_fixes(scan_remove)
+    result_remove = engine.apply_plan(plan_remove)
+    assert result_remove.success
+
+    updated_after_remove = pyproject.read_text(encoding="utf-8")
+    assert '"requests"' not in updated_after_remove
+    assert '"httpx"' in updated_after_remove
+    # Verify tool section still untouched
+    assert '"internal-package"' in updated_after_remove
+
+
+def test_remediation_initialize_metadata_preserves_tables(tmp_path: Path):
+    """Test PKG-001 initialization preserves existing tables in pyproject.toml."""
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """[tool.ruff]
+line-length = 100
+""",
+        encoding="utf-8",
+    )
+
+    engine = RemediationEngine(project_root=tmp_path)
+    scan_result = ScanResult(
+        project_name="demo-pkg",
+        project_path=str(tmp_path),
+        python_version="3.12.0",
+        package_manager="uv",
+        summary=ScanSummary(errors_count=1),
+        diagnostics=[
+            Diagnostic(
+                id="PKG-001",
+                severity=Severity.ERROR,
+                category="packaging",
+                title="Missing metadata",
+                message="pyproject.toml lacks [project] table",
+            )
+        ],
+    )
+
+    plan = engine.plan_fixes(scan_result)
+    result = engine.apply_plan(plan)
+    assert result.success
+
+    content = pyproject.read_text(encoding="utf-8")
+    assert "[project]" in content
+    assert "[tool.ruff]" in content
+    assert "line-length = 100" in content
