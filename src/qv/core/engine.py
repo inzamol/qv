@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
+from qv.analyzers.docker.analyzer import DockerAnalyzer
 from qv.analyzers.environment.drift import EnvironmentAnalyzer
 from qv.analyzers.imports.analyzer import ImportAnalyzer
 from qv.analyzers.packaging.analyzer import PackagingAnalyzer
@@ -41,6 +42,7 @@ class AnalysisEngine:
             self.analyzers = [
                 PackagingAnalyzer(),
                 EnvironmentAnalyzer(),
+                DockerAnalyzer(),
                 DependencyAnalyzer(),
                 ImportAnalyzer(),
                 SecurityAnalyzer(),

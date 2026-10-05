@@ -759,7 +759,11 @@ class ProjectDiscovery:
     def _discover_docker(self) -> DockerConfig:
         dockerfile = self.root / "Dockerfile"
         if not dockerfile.exists() or not self._is_within_boundary(dockerfile):
-            return DockerConfig(has_dockerfile=False)
+            alt_dockerfile = self.root / "docker" / "Dockerfile"
+            if alt_dockerfile.exists() and self._is_within_boundary(alt_dockerfile):
+                dockerfile = alt_dockerfile
+            else:
+                return DockerConfig(has_dockerfile=False)
 
         base_image = None
         base_python = None
@@ -774,11 +778,23 @@ class ProjectDiscovery:
         except Exception:
             pass
 
+        dockerignore = self.root / ".dockerignore"
+        has_dockerignore = dockerignore.exists() and self._is_within_boundary(dockerignore)
+
+        compose_files: list[Path] = []
+        for name in ("docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"):
+            cfile = self.root / name
+            if cfile.exists() and self._is_within_boundary(cfile):
+                compose_files.append(cfile)
+
         return DockerConfig(
             has_dockerfile=True,
             dockerfile_path=dockerfile,
             base_image=base_image,
             base_python_version=base_python,
+            has_dockerignore=has_dockerignore,
+            dockerignore_path=dockerignore if has_dockerignore else None,
+            compose_files=tuple(compose_files),
         )
 
     def _discover_ci(self) -> CIConfig:

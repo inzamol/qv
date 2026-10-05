@@ -1,0 +1,8 @@
+[project]
+name = "docker-example-app"
+version = "0.1.0"
+description = "Example project demonstrating Docker container configuration issues."
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+]

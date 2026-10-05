@@ -14,6 +14,7 @@ from rich.table import Table
 
 from qv import __version__
 from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
+from qv.analyzers.docker.analyzer import DockerAnalyzer
 from qv.analyzers.environment.drift import EnvironmentAnalyzer
 from qv.analyzers.imports.analyzer import ImportAnalyzer
 from qv.core.config import ConfigurationError
@@ -482,6 +483,22 @@ def architecture_cmd(path: Path) -> None:
     with _handle_cli_errors("Architecture analysis"):
         project = load_project(path)
         engine = AnalysisEngine(config=project.config, analyzers=[ImportAnalyzer()])
+        result = engine.run(project.context)
+        TerminalReporter(console=console).print_result(result)
+        sys.exit(1 if result.has_blocking_errors else 0)
+
+
+@cli.command("docker")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+def docker_cmd(path: Path) -> None:
+    """Run Docker and container configuration checks only."""
+    with _handle_cli_errors("Docker analysis"):
+        project = load_project(path)
+        engine = AnalysisEngine(config=project.config, analyzers=[DockerAnalyzer()])
         result = engine.run(project.context)
         TerminalReporter(console=console).print_result(result)
         sys.exit(1 if result.has_blocking_errors else 0)
