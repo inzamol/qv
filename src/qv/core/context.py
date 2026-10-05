@@ -80,6 +80,9 @@ class DockerConfig:
     dockerfile_path: Path | None = None
     base_image: str | None = None
     base_python_version: str | None = None
+    has_dockerignore: bool = False
+    dockerignore_path: Path | None = None
+    compose_files: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True)

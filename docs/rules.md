@@ -452,23 +452,97 @@
 
 ---
 
-## 8. Engine & Execution Rules (`ENG-xxx`)
+## 8. Docker & Container Rules (`DOC-xxx`)
 
-### 8.1 ENG-001: Analyzer Execution Failed
+### 8.1 DOC-001: Inefficient Docker Layer Caching
+- **Default Severity:** `WARNING`
+- **Description:** Source code is copied before package dependencies are installed (`COPY . .` before `RUN pip install ...` or `RUN uv sync`), invalidating the build cache on every code change.
+- **Remediation:** Copy dependency manifests (e.g. `pyproject.toml`, `requirements.txt`, `uv.lock`) and install packages before copying the full project directory (`COPY . .`).
+
+### 8.2 DOC-002: Root User Container Execution
+- **Default Severity:** `WARNING`
+- **Description:** The Dockerfile configures an execution entrypoint (`CMD`/`ENTRYPOINT`) without specifying a non-root `USER`.
+- **Remediation:** Create and switch to a non-privileged user (e.g. `RUN useradd -m -u 1000 appuser && USER appuser`) before the container entrypoint.
+
+### 8.3 DOC-003: Unpinned Base Image Tag
+- **Default Severity:** `INFO`
+- **Description:** The base image uses `:latest` or an unpinned tag, which leads to non-reproducible and unpredictable builds.
+- **Remediation:** Pin the base image to a specific version or hash (e.g. `python:3.12-slim-bookworm`).
+
+### 8.4 DOC-004: Missing .dockerignore File
+- **Default Severity:** `WARNING`
+- **Description:** A Dockerfile exists in the project but no `.dockerignore` file is present, risking baking local virtualenvs, credentials, and temp files into the image.
+- **Remediation:** Create a `.dockerignore` file in the repository root excluding `.git`, `.venv`, `__pycache__`, and sensitive files.
+
+### 8.5 DOC-005: Missing --no-cache-dir in pip install
+- **Default Severity:** `INFO`
+- **Description:** `pip install` inside Dockerfile runs without `--no-cache-dir`, which unnecessarily bloats the container layer with cached wheels.
+- **Remediation:** Add `--no-cache-dir` to pip install commands (e.g. `pip install --no-cache-dir -r requirements.txt`).
+
+### 8.6 DOC-006: Sensitive File Copied into Docker Image
+- **Default Severity:** `ERROR`
+- **Description:** The Dockerfile explicitly copies sensitive files (`.env`, private keys, or credentials) into the container image layer.
+- **Remediation:** Remove sensitive files from `COPY` instructions and use Docker BuildKit secrets (`--mount=type=secret`) or runtime environment variables instead.
+
+### 8.7 DOC-007: Missing HEALTHCHECK Instruction
+- **Default Severity:** `INFO`
+- **Description:** The Dockerfile configures a network service or entrypoint without defining a container `HEALTHCHECK`.
+- **Remediation:** Add a `HEALTHCHECK` instruction (e.g. `HEALTHCHECK --interval=30s CMD curl -f http://localhost:8000/health || exit 1`).
+
+### 8.8 DOC-008: Missing PYTHONUNBUFFERED Environment Variable
+- **Default Severity:** `INFO`
+- **Description:** Python buffers stdout/stderr by default, which delays or prevents real-time container log streaming.
+- **Remediation:** Add `ENV PYTHONUNBUFFERED=1` to your Dockerfile to ensure unbuffered real-time log output.
+
+### 8.9 DOC-009: Deprecated MAINTAINER Instruction Used
+- **Default Severity:** `INFO`
+- **Description:** The `MAINTAINER` instruction is deprecated in Dockerfile syntax in favor of metadata labels.
+- **Remediation:** Replace `MAINTAINER <author>` with `LABEL maintainer="<author>"`.
+
+### 8.10 DOC-010: Unnecessary sudo Usage in RUN Instruction
+- **Default Severity:** `WARNING`
+- **Description:** Commands in Docker `RUN` instructions execute with root privileges by default, making `sudo` redundant and error-prone.
+- **Remediation:** Remove `sudo` from `RUN` instructions during image build.
+
+### 8.11 DOC-011: apt-get install Without Cleanup
+- **Default Severity:** `INFO`
+- **Description:** `apt-get install` inside Dockerfile leaves package lists and recommended dependencies in image layers, bloating image size.
+- **Remediation:** Use `apt-get install -y --no-install-recommends <pkgs> && rm -rf /var/lib/apt/lists/*` in the same `RUN` layer.
+
+### 8.12 DOC-012: ADD Instruction Used for Local File Copy
+- **Default Severity:** `INFO`
+- **Description:** The `ADD` instruction was used to copy local files where `COPY` is preferred for predictability and security.
+- **Remediation:** Replace `ADD` with `COPY` unless automatic tar archive extraction or remote URL fetching is explicitly intended.
+
+### 8.13 DOC-013: Missing PYTHONDONTWRITEBYTECODE
+- **Default Severity:** `INFO`
+- **Description:** Python creates `.pyc` bytecode cache files inside container layers that are usually unnecessary in ephemeral containers.
+- **Remediation:** Add `ENV PYTHONDONTWRITEBYTECODE=1` to prevent writing `.pyc` files to container filesystem layers.
+
+### 8.14 DOC-014: Web Server Entrypoint Missing EXPOSE
+- **Default Severity:** `INFO`
+- **Description:** The container starts a web server but does not declare the listening network port via `EXPOSE`.
+- **Remediation:** Add `EXPOSE <port>` (e.g. `EXPOSE 8000`) to document the port on which the container listens.
+
+---
+
+## 9. Engine & Execution Rules (`ENG-xxx`)
+
+### 9.1 ENG-001: Analyzer Execution Failed
 - **Default Severity:** `ERROR`
 - **Description:** An analyzer raised an unexpected exception during execution.
 - **Remediation:** Check the error message or report a bug to the analyzer maintainer.
 
 ---
 
-## 9. Discovery & Parser Rules (`DISC-xxx`)
+## 10. Discovery & Parser Rules (`DISC-xxx`)
 
-### 9.1 DISC-001: Unreadable Source File
+### 10.1 DISC-001: Unreadable Source File
 - **Default Severity:** `WARNING`
 - **Description:** A source file could not be read during project discovery due to permissions or encoding errors.
 - **Remediation:** Check file read permissions and ensure file is encoded in valid UTF-8.
 
-### 9.2 DISC-002: Python Syntax Error in Source File
+### 10.2 DISC-002: Python Syntax Error in Source File
 - **Default Severity:** `WARNING`
 - **Description:** A Python source file contains invalid syntax and could not be parsed into an AST.
 - **Remediation:** Fix the syntax error in the source file.

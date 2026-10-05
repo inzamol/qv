@@ -14,6 +14,7 @@ This directory contains standalone example projects demonstrating all diagnostic
 | **[`unresolved_imports/`](./unresolved_imports)** | `IMP-002` | Architecture | Code imports `from app.auth.missing_token import verify_token`, which does not exist. | ℹ️ Code Edit |
 | **[`missing_metadata/`](./missing_metadata)** | `PKG-001` | Packaging | Bare `pyproject.toml` missing the required PEP 621 `[project]` metadata table. | ✅ Yes |
 | **[`environment_drift/`](./environment_drift)** | `ENV-002`, `ENV-003` | Environment | Target Python is `>=3.12`, but Dockerfile uses `3.10` and CI matrix runs `3.9`. | ℹ️ Docker/CI Config |
+| **[`docker_issues/`](./docker_issues)** | `DOC-001` - `DOC-006` | Docker | Dockerfile with caching anti-patterns, root execution, unpinned base image, and sensitive copies. | ℹ️ Container Config |
 | **[`dead_modules/`](./dead_modules)** | `IMP-003` | Architecture | `unused_legacy_module.py` exists in source code but is never imported anywhere. | ℹ️ Dead Code Removal |
 | **[`deprecated_stdlib/`](./deprecated_stdlib)** | `IMP-004` | Compatibility | Code imports removed stdlib modules (`imp`, `distutils`, `cgi`, `pipes` in Python 3.12/3.13). | ℹ️ Modernization |
 | **[`vulnerable_dependencies/`](./vulnerable_dependencies)** | `DEP-006` | Security | Project pins `jinja2==2.11.2` with known critical security vulnerabilities & CVEs. | ℹ️ Security Upgrade |
