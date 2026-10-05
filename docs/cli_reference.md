@@ -33,12 +33,39 @@ qv init ./services/backend
 
 ---
 
-## 3. `qv scan`
+## 3. `qv doctor`
 
-Runs full diagnostic analysis on the specified directory.
+One command that provides a complete, high-level project health scorecard across all 6 core pillars (Dependencies, Security, Packaging, Architecture, Environment, Framework) with progress bars and top priority problems.
 
 ```bash
-qv scan [PATH] [OPTIONS]
+qv doctor [PATH] [OPTIONS]
+```
+
+Example:
+
+```text
+QV Project Health
+────────────────────────────────────────
+
+Dependencies      92/100   █████████░
+Security           84/100   ████████░░
+Packaging          96/100   ██████████
+Architecture       78/100   ████████░░
+Environment        91/100   █████████░
+Framework          88/100   █████████░
+
+Health Score: 87/100
+
+3 high-priority issues
+7 warnings
+42 checks passed
+
+Top problems:
+  1. SQL-014  N+1 query detected
+  2. DEP-002  Missing dependency: httpx
+  3. ENV-003  Python version mismatch
+
+Run `qv explain SQL-014` for details.
 ```
 
 ### 3.1 Arguments
@@ -48,6 +75,37 @@ qv scan [PATH] [OPTIONS]
 | `PATH` | Path to the project root directory | `.` (current directory) |
 
 ### 3.2 Options
+
+| Option | Description |
+|---|---|
+| `--strict` | Promotes warnings to errors (fails CI if any warnings exist) |
+| `--ci` | Runs non-interactively with strict mode enabled |
+| `--json` | Emits doctor health scorecard as structured JSON |
+| `--sarif` | Emits scan results as standard SARIF v2.1.0 format |
+| `--top <N>` | Number of top problems to highlight (default: 3) |
+| `--format`, `-f <FORMAT>` | Specify output format (`terminal`, `json`, `sarif`, `html`, `text`) |
+| `--html <FILE>` | Generates an interactive, standalone HTML dashboard |
+| `--github-annotations` | Emits GitHub Actions inline PR workflow annotations |
+| `--offline` | Disables remote vulnerability/CVE queries (airgapped mode) |
+| `--output`, `-o <FILE>` | Writes output directly to a file |
+
+---
+
+## 4. `qv scan`
+
+Runs full diagnostic analysis on the specified directory.
+
+```bash
+qv scan [PATH] [OPTIONS]
+```
+
+### 4.1 Arguments
+
+| Argument | Description | Default |
+|---|---|---|
+| `PATH` | Path to the project root directory | `.` (current directory) |
+
+### 4.2 Options
 
 | Option | Description |
 |---|---|
@@ -64,7 +122,7 @@ qv scan [PATH] [OPTIONS]
 | `--severity <LEVEL>` | Filter findings by minimum severity (`error`, `warning`, `info`) |
 | `--output`, `-o <FILE>` | Writes output directly to a file |
 
-### 3.3 Exit Codes
+### 4.3 Exit Codes
 
 | Exit Code | Meaning |
 |---|---|
@@ -75,7 +133,7 @@ qv scan [PATH] [OPTIONS]
 
 ---
 
-## 4. `qv inspect` (alias: `qv ui`)
+## 5. `qv inspect` (alias: `qv ui`)
 
 Launches an interactive terminal dashboard (TUI) to navigate findings, expand evidence, view dependency trees, and apply fixes interactively with keyboard shortcuts.
 
@@ -84,7 +142,7 @@ qv inspect [PATH] [OPTIONS]
 qv ui [PATH] [OPTIONS]
 ```
 
-### 4.1 Controls
+### 5.1 Controls
 
 | Key | Action |
 |---|---|
@@ -97,7 +155,7 @@ qv ui [PATH] [OPTIONS]
 
 ---
 
-## 5. `qv fix`
+## 6. `qv fix`
 
 Safely and deterministically fixes detectable diagnostic health issues (e.g., adding missing dependencies to `pyproject.toml`, creating default configuration schemas, and initializing packaging metadata). Note that unused dependency removals (`DEP-003`) are marked for manual review to prevent accidental deletion of runtime plugins.
 
@@ -105,7 +163,7 @@ Safely and deterministically fixes detectable diagnostic health issues (e.g., ad
 qv fix [PATH] [OPTIONS]
 ```
 
-### 5.1 Options
+### 6.1 Options
 
 | Option | Description |
 |---|---|
@@ -126,7 +184,7 @@ qv fix -y
 
 ---
 
-## 6. `qv tree` / `qv graph`
+## 7. `qv tree` / `qv graph`
 
 Visualizes direct vs transitive package dependencies and internal source module import architecture (with circular import cycles highlighted).
 
@@ -134,7 +192,7 @@ Visualizes direct vs transitive package dependencies and internal source module 
 qv tree [PATH] [OPTIONS]
 ```
 
-### 6.1 Options
+### 7.1 Options
 
 | Option | Description |
 |---|---|
@@ -158,7 +216,7 @@ qv tree -d -L 2
 
 ---
 
-## 7. `qv explain`
+## 8. `qv explain`
 
 Displays detailed explanations, evidence requirements, and remediation instructions for a rule.
 
@@ -174,7 +232,7 @@ qv explain DEP-002
 
 ---
 
-## 8. Targeted Subsystem Commands
+## 9. Targeted Subsystem Commands
 
 Run focused checks on specific areas without executing the full scan:
 
