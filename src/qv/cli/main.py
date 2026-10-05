@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from pathlib import Path
 
 import click
@@ -16,7 +18,7 @@ from qv.analyzers.environment.drift import EnvironmentAnalyzer
 from qv.analyzers.imports.analyzer import ImportAnalyzer
 from qv.core.config import ConfigurationError
 from qv.core.engine import AnalysisEngine
-from qv.core.models import Severity
+from qv.core.models import ScanResult, Severity
 from qv.core.project import load_project
 from qv.frameworks import AVAILABLE_FRAMEWORK_ANALYZERS
 from qv.remediation.engine import RemediationEngine
@@ -41,6 +43,92 @@ if sys.platform == "win32":
         pass
 
 console = Console()
+
+
+@contextmanager
+def _handle_cli_errors(action_name: str) -> Generator[None, None, None]:
+    """Uniformly handle configuration, click, and unexpected runtime errors across CLI commands."""
+    try:
+        yield
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]{action_name} failed:[/bold red] {e}")
+        sys.exit(3)
+    finally:
+        pass
+
+
+def _run_analysis_pipeline(
+    path: Path,
+    strict: bool = False,
+    ci_mode: bool = False,
+    offline: bool = False,
+    hide_warnings: bool = False,
+    errors_only: bool = False,
+    min_severity: str | None = None,
+    html_output: Path | None = None,
+    github_annotations: bool = False,
+) -> ScanResult:
+    """Load project context, apply configuration flags, execute engine, and emit annotations/HTML."""
+    project = load_project(path)
+    config = project.config
+    if strict or ci_mode:
+        config.strict = True
+    if offline:
+        config.offline = True
+    if hide_warnings:
+        config.hide_warnings = True
+    if errors_only:
+        config.errors_only = True
+    if min_severity:
+        config.min_severity = Severity(min_severity.lower())
+
+    engine = AnalysisEngine(config=config)
+    result = engine.run(project.context)
+
+    if github_annotations or ci_mode:
+        annotator = GitHubAnnotator()
+        if github_annotations:
+            annotator.emit_annotations(result)
+        annotator.write_step_summary(result)
+
+    if html_output:
+        html_content = HtmlReporter().render(result)
+        html_output.write_text(html_content, encoding="utf-8")
+        console.print(f"[green]HTML report successfully written to {html_output}[/green]")
+
+    return result
+
+
+def _render_and_dispatch_output(
+    result: ScanResult,
+    rendered: str | None,
+    default_renderer: Callable[[], str],
+    print_handler: Callable[[], None],
+    output: Path | None,
+    success_message: str,
+    strict: bool,
+    ci_mode: bool,
+) -> None:
+    """Output rendered report to disk or terminal, exiting with appropriate exit code."""
+    if output:
+        content_to_write = rendered if rendered is not None else default_renderer()
+        output.write_text(content_to_write, encoding="utf-8")
+        console.print(f"[green]{success_message} {output}[/green]")
+    elif rendered is not None:
+        click.echo(rendered)
+    else:
+        print_handler()
+
+    if result.has_blocking_errors or ((strict or ci_mode) and result.summary.warnings_count > 0):
+        sys.exit(1)
+    sys.exit(0)
 
 
 @click.group(invoke_without_command=False)
@@ -131,66 +219,35 @@ def doctor_cmd(
         elif fmt == "sarif":
             as_sarif = True
 
-    try:
-        project = load_project(path)
-        config = project.config
-        if strict or ci_mode:
-            config.strict = True
-        if offline:
-            config.offline = True
-
-        engine = AnalysisEngine(config=config)
-        result = engine.run(project.context)
-
-        # Handle GitHub annotations & step summaries
-        if github_annotations or ci_mode:
-            annotator = GitHubAnnotator()
-            if github_annotations:
-                annotator.emit_annotations(result)
-            annotator.write_step_summary(result)
-
-        # Handle HTML report output
-        if html_output:
-            html_content = HtmlReporter().render(result)
-            html_output.write_text(html_content, encoding="utf-8")
-            console.print(f"[green]HTML report successfully written to {html_output}[/green]")
+    with _handle_cli_errors("Doctor analysis"):
+        result = _run_analysis_pipeline(
+            path=path,
+            strict=strict,
+            ci_mode=ci_mode,
+            offline=offline,
+            html_output=html_output,
+            github_annotations=github_annotations,
+        )
 
         doctor_reporter = DoctorReporter(console=console, top_n=top_n)
+        rendered = (
+            SarifReporter().render(result)
+            if as_sarif
+            else doctor_reporter.build_report(result).to_json(indent=2)
+            if as_json
+            else None
+        )
 
-        if as_sarif:
-            rendered = SarifReporter().render(result)
-        elif as_json:
-            report = doctor_reporter.build_report(result)
-            rendered = report.to_json(indent=2)
-        else:
-            rendered = None
-
-        if output:
-            content_to_write = rendered if rendered is not None else doctor_reporter.render(result)
-            output.write_text(content_to_write, encoding="utf-8")
-            console.print(f"[green]Health report successfully written to {output}[/green]")
-        elif rendered is not None:
-            click.echo(rendered)
-        else:
-            doctor_reporter.print_result(result)
-
-        # Determine exit code
-        if result.has_blocking_errors:
-            sys.exit(1)
-        if (strict or ci_mode) and result.summary.warnings_count > 0:
-            sys.exit(1)
-        sys.exit(0)
-
-    except ConfigurationError as e:
-        console.print(f"[bold red]Configuration error:[/bold red] {e}")
-        sys.exit(2)
-    except click.ClickException:
-        raise
-    except SystemExit:
-        raise
-    except Exception as e:
-        console.print(f"[bold red]Doctor analysis failed:[/bold red] {e}")
-        sys.exit(3)
+        _render_and_dispatch_output(
+            result=result,
+            rendered=rendered,
+            default_renderer=lambda: doctor_reporter.render(result),
+            print_handler=lambda: doctor_reporter.print_result(result),
+            output=output,
+            success_message="Health report successfully written to",
+            strict=strict,
+            ci_mode=ci_mode,
+        )
 
 
 @cli.command("scan")
@@ -272,78 +329,39 @@ def scan(
             as_json = True
         elif fmt == "sarif":
             as_sarif = True
-        elif fmt == "html" and not html_output:
-            # If user ran --format html without --html, default to writing report.html or stdout
-            pass
-    try:
-        project = load_project(path)
-        config = project.config
-        if strict or ci_mode:
-            config.strict = True
-        if offline:
-            config.offline = True
-        if hide_warnings:
-            config.hide_warnings = True
-        if errors_only:
-            config.errors_only = True
-        if min_severity:
-            config.min_severity = Severity(min_severity.lower())
 
-        engine = AnalysisEngine(config=config)
-        result = engine.run(project.context)
+    with _handle_cli_errors("Analysis"):
+        result = _run_analysis_pipeline(
+            path=path,
+            strict=strict,
+            ci_mode=ci_mode,
+            offline=offline,
+            hide_warnings=hide_warnings,
+            errors_only=errors_only,
+            min_severity=min_severity,
+            html_output=html_output,
+            github_annotations=github_annotations,
+        )
 
-        # Handle GitHub annotations & step summaries
-        if github_annotations or ci_mode:
-            annotator = GitHubAnnotator()
-            if github_annotations:
-                annotator.emit_annotations(result)
-            annotator.write_step_summary(result)
+        rendered = (
+            SarifReporter().render(result)
+            if as_sarif
+            else JsonReporter().render(result)
+            if as_json
+            else None
+        )
 
-        # Handle HTML report output
-        if html_output:
-            html_content = HtmlReporter().render(result)
-            html_output.write_text(html_content, encoding="utf-8")
-            console.print(f"[green]HTML report successfully written to {html_output}[/green]")
-
-        # Select reporter
-        if as_sarif:
-            reporter = SarifReporter()
-            rendered = reporter.render(result)
-        elif as_json:
-            reporter = JsonReporter()
-            rendered = reporter.render(result)
-        else:
-            reporter = TerminalReporter(console=console)
-            rendered = None
-
-        if output:
-            content_to_write = (
-                rendered if rendered is not None else TerminalReporter().render(result)
-            )
-            output.write_text(content_to_write, encoding="utf-8")
-            console.print(f"[green]Report successfully written to {output}[/green]")
-        elif rendered is not None:
-            click.echo(rendered)
-        else:
-            TerminalReporter(console=console).print_result(result)
-
-        # Determine exit code
-        if result.has_blocking_errors:
-            sys.exit(1)
-        if (strict or ci_mode) and result.summary.warnings_count > 0:
-            sys.exit(1)
-        sys.exit(0)
-
-    except ConfigurationError as e:
-        console.print(f"[bold red]Configuration error:[/bold red] {e}")
-        sys.exit(2)
-    except click.ClickException:
-        raise
-    except SystemExit:
-        raise
-    except Exception as e:
-        console.print(f"[bold red]Analysis failed:[/bold red] {e}")
-        sys.exit(3)
+        terminal_reporter = TerminalReporter(console=console)
+        _render_and_dispatch_output(
+            result=result,
+            rendered=rendered,
+            default_renderer=lambda: TerminalReporter().render(result),
+            print_handler=lambda: terminal_reporter.print_result(result),
+            output=output,
+            success_message="Report successfully written to",
+            strict=strict,
+            ci_mode=ci_mode,
+        )
 
 
 @cli.command("explain")
@@ -429,22 +447,12 @@ exclude = [
 )
 def dependency_cmd(path: Path) -> None:
     """Run dependency-focused checks only."""
-    try:
+    with _handle_cli_errors("Dependency analysis"):
         project = load_project(path)
         engine = AnalysisEngine(config=project.config, analyzers=[DependencyAnalyzer()])
         result = engine.run(project.context)
         TerminalReporter(console=console).print_result(result)
         sys.exit(1 if result.has_blocking_errors else 0)
-    except ConfigurationError as e:
-        console.print(f"[bold red]Configuration error:[/bold red] {e}")
-        sys.exit(2)
-    except click.ClickException:
-        raise
-    except SystemExit:
-        raise
-    except Exception as e:
-        console.print(f"[bold red]Analysis failed:[/bold red] {e}")
-        sys.exit(3)
 
 
 @cli.command("environment")
@@ -455,22 +463,12 @@ def dependency_cmd(path: Path) -> None:
 )
 def environment_cmd(path: Path) -> None:
     """Run environment and runtime drift checks only."""
-    try:
+    with _handle_cli_errors("Environment analysis"):
         project = load_project(path)
         engine = AnalysisEngine(config=project.config, analyzers=[EnvironmentAnalyzer()])
         result = engine.run(project.context)
         TerminalReporter(console=console).print_result(result)
         sys.exit(1 if result.has_blocking_errors else 0)
-    except ConfigurationError as e:
-        console.print(f"[bold red]Configuration error:[/bold red] {e}")
-        sys.exit(2)
-    except click.ClickException:
-        raise
-    except SystemExit:
-        raise
-    except Exception as e:
-        console.print(f"[bold red]Analysis failed:[/bold red] {e}")
-        sys.exit(3)
 
 
 @cli.command("architecture")
@@ -481,22 +479,12 @@ def environment_cmd(path: Path) -> None:
 )
 def architecture_cmd(path: Path) -> None:
     """Run AST and import architecture checks only."""
-    try:
+    with _handle_cli_errors("Architecture analysis"):
         project = load_project(path)
         engine = AnalysisEngine(config=project.config, analyzers=[ImportAnalyzer()])
         result = engine.run(project.context)
         TerminalReporter(console=console).print_result(result)
         sys.exit(1 if result.has_blocking_errors else 0)
-    except ConfigurationError as e:
-        console.print(f"[bold red]Configuration error:[/bold red] {e}")
-        sys.exit(2)
-    except click.ClickException:
-        raise
-    except SystemExit:
-        raise
-    except Exception as e:
-        console.print(f"[bold red]Analysis failed:[/bold red] {e}")
-        sys.exit(3)
 
 
 @cli.command("fix")
@@ -700,7 +688,7 @@ def tree_cmd(
     as_json: bool,
 ) -> None:
     """Visualize dependency trees and import architecture."""
-    try:
+    with _handle_cli_errors("Tree visualization"):
         project = load_project(path)
         visualizer = TreeVisualizer(context=project.context)
 
@@ -729,17 +717,6 @@ def tree_cmd(
             console.print()
 
         sys.exit(0)
-
-    except ConfigurationError as e:
-        console.print(f"[bold red]Configuration error:[/bold red] {e}")
-        sys.exit(2)
-    except click.ClickException:
-        raise
-    except SystemExit:
-        raise
-    except Exception as e:
-        console.print(f"[bold red]Tree visualization failed:[/bold red] {e}")
-        sys.exit(3)
 
 
 @cli.command("graph")
@@ -791,7 +768,7 @@ def graph_cmd(
 @click.option("--sarif", "as_sarif", is_flag=True, help="Output SARIF results.")
 def framework_cmd(path: Path, name: str | None, as_json: bool, as_sarif: bool) -> None:
     """Run framework-specific doctors (FastAPI, SQLAlchemy)."""
-    try:
+    with _handle_cli_errors("Framework analysis"):
         project = load_project(path)
 
         # Select framework analyzers
@@ -828,16 +805,6 @@ def framework_cmd(path: Path, name: str | None, as_json: bool, as_sarif: bool) -
         if result.has_blocking_errors:
             sys.exit(1)
         sys.exit(0)
-    except ConfigurationError as e:
-        console.print(f"[bold red]Configuration error:[/bold red] {e}")
-        sys.exit(2)
-    except click.ClickException:
-        raise
-    except SystemExit:
-        raise
-    except Exception as e:
-        console.print(f"[bold red]Error running framework analysis: {e}[/bold red]")
-        sys.exit(3)
 
 
 @cli.command("frameworks")

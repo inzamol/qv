@@ -149,52 +149,34 @@ class DoctorReporter:
             elif diag.severity == Severity.INFO:
                 category_counts[pillar_id]["info"] += 1
 
-        # Calculate scores per pillar
-        categories: list[CategoryHealth] = []
-        for pillar_id, pillar_name in STANDARD_PILLARS:
-            counts = category_counts.get(pillar_id, {"errors": 0, "warnings": 0, "info": 0})
-            errs = counts["errors"]
-            warns = counts["warnings"]
-            infos = counts["info"]
-
-            penalty = (errs * 15) + (warns * 5)
-            score = max(0, min(100, 100 - penalty))
-            bar = make_bar(score, width=10)
-
-            categories.append(
-                CategoryHealth(
-                    id=pillar_id,
-                    name=pillar_name,
-                    score=score,
-                    errors_count=errs,
-                    warnings_count=warns,
-                    info_count=infos,
-                    bar=bar,
-                )
+        def _calc_category(
+            cat_id: str, display_name: str, counts_dict: dict[str, int]
+        ) -> CategoryHealth:
+            errs = counts_dict.get("errors", 0)
+            warns = counts_dict.get("warnings", 0)
+            infos = counts_dict.get("info", 0)
+            score_val = max(0, min(100, 100 - (errs * 15 + warns * 5)))
+            return CategoryHealth(
+                id=cat_id,
+                name=display_name,
+                score=score_val,
+                errors_count=errs,
+                warnings_count=warns,
+                info_count=infos,
+                bar=make_bar(score_val, width=10),
             )
 
+        categories: list[CategoryHealth] = [
+            _calc_category(p_id, p_name, category_counts.get(p_id, {}))
+            for p_id, p_name in STANDARD_PILLARS
+        ]
+
         # Include any non-standard categories if they have findings
-        for cat_id, counts in category_counts.items():
-            if any(p[0] == cat_id for p in STANDARD_PILLARS):
-                continue
-            if counts["errors"] > 0 or counts["warnings"] > 0:
-                errs = counts["errors"]
-                warns = counts["warnings"]
-                infos = counts["info"]
-                penalty = (errs * 15) + (warns * 5)
-                score = max(0, min(100, 100 - penalty))
-                bar = make_bar(score, width=10)
-                categories.append(
-                    CategoryHealth(
-                        id=cat_id,
-                        name=cat_id.title(),
-                        score=score,
-                        errors_count=errs,
-                        warnings_count=warns,
-                        info_count=infos,
-                        bar=bar,
-                    )
-                )
+        for c_id, counts in category_counts.items():
+            if not any(p[0] == c_id for p in STANDARD_PILLARS) and (
+                counts.get("errors", 0) > 0 or counts.get("warnings", 0) > 0
+            ):
+                categories.append(_calc_category(c_id, c_id.title(), counts))
 
         # Calculate overall health score from categories
         if categories:
