@@ -21,6 +21,7 @@ from qv.core.project import load_project
 from qv.frameworks import AVAILABLE_FRAMEWORK_ANALYZERS
 from qv.remediation.engine import RemediationEngine
 from qv.remediation.models import FixActionType
+from qv.reporters.doctor_reporter import DoctorReporter
 from qv.reporters.github_annotator import GitHubAnnotator
 from qv.reporters.html_reporter import HtmlReporter
 from qv.reporters.json_reporter import JsonReporter
@@ -47,6 +48,133 @@ console = Console()
 def cli() -> None:
     """qv - Diagnose why a Python project is unhealthy."""
     pass
+
+
+@cli.command("doctor")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option("--strict", is_flag=True, help="Promote warnings to errors (fails CI on warnings).")
+@click.option("--ci", "ci_mode", is_flag=True, help="Run in CI mode with non-interactive output.")
+@click.option("--json", "as_json", is_flag=True, help="Output health scorecard in JSON format.")
+@click.option(
+    "--sarif", "as_sarif", is_flag=True, help="Output diagnostics in SARIF v2.1.0 format."
+)
+@click.option(
+    "--output", "-o", type=click.Path(dir_okay=False, path_type=Path), help="Write output to file."
+)
+@click.option(
+    "--offline", is_flag=True, help="Disable remote vulnerability/CVE queries (airgapped mode)."
+)
+@click.option(
+    "--html",
+    "html_output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Generate interactive HTML dashboard report.",
+)
+@click.option(
+    "--github-annotations",
+    is_flag=True,
+    help="Emit GitHub Actions inline workflow command annotations.",
+)
+@click.option(
+    "--top",
+    "top_n",
+    type=int,
+    default=3,
+    help="Number of top problems to highlight (default: 3).",
+)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["terminal", "json", "sarif", "html", "text"], case_sensitive=False),
+    default=None,
+    help="Output format (terminal, json, sarif, html, text).",
+)
+def doctor_cmd(
+    path: Path,
+    strict: bool,
+    ci_mode: bool,
+    as_json: bool,
+    as_sarif: bool,
+    output: Path | None,
+    offline: bool,
+    html_output: Path | None,
+    github_annotations: bool,
+    top_n: int = 3,
+    output_format: str | None = None,
+) -> None:
+    """Give a complete project health report and diagnosis."""
+    if output_format:
+        fmt = output_format.lower()
+        if fmt == "json":
+            as_json = True
+        elif fmt == "sarif":
+            as_sarif = True
+
+    try:
+        project = load_project(path)
+        config = project.config
+        if strict or ci_mode:
+            config.strict = True
+        if offline:
+            config.offline = True
+
+        engine = AnalysisEngine(config=config)
+        result = engine.run(project.context)
+
+        # Handle GitHub annotations & step summaries
+        if github_annotations or ci_mode:
+            annotator = GitHubAnnotator()
+            if github_annotations:
+                annotator.emit_annotations(result)
+            annotator.write_step_summary(result)
+
+        # Handle HTML report output
+        if html_output:
+            html_content = HtmlReporter().render(result)
+            html_output.write_text(html_content, encoding="utf-8")
+            console.print(f"[green]HTML report successfully written to {html_output}[/green]")
+
+        doctor_reporter = DoctorReporter(console=console, top_n=top_n)
+
+        if as_sarif:
+            rendered = SarifReporter().render(result)
+        elif as_json:
+            report = doctor_reporter.build_report(result)
+            rendered = report.to_json(indent=2)
+        else:
+            rendered = None
+
+        if output:
+            content_to_write = rendered if rendered is not None else doctor_reporter.render(result)
+            output.write_text(content_to_write, encoding="utf-8")
+            console.print(f"[green]Health report successfully written to {output}[/green]")
+        elif rendered is not None:
+            click.echo(rendered)
+        else:
+            doctor_reporter.print_result(result)
+
+        # Determine exit code
+        if result.has_blocking_errors:
+            sys.exit(1)
+        if (strict or ci_mode) and result.summary.warnings_count > 0:
+            sys.exit(1)
+        sys.exit(0)
+
+    except ConfigurationError as e:
+        console.print(f"[bold red]Configuration error:[/bold red] {e}")
+        sys.exit(2)
+    except click.ClickException:
+        raise
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Doctor analysis failed:[/bold red] {e}")
+        sys.exit(3)
 
 
 @cli.command("scan")

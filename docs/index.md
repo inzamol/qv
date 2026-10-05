@@ -58,28 +58,43 @@ flowchart TD
 
 ## 2. Install & Usage
 
-Run `qv scan` directly in any Python project root without configuration or network access:
+Run `qv doctor` or `qv scan` directly in any Python project root:
 
 === "Using uv"
     ```bash
     uv add python-qv --dev
-    uv run qv scan
+    uv run qv doctor
     ```
 
 === "Using pip"
     ```bash
     pip install python-qv
-    qv scan
+    qv doctor
+    ```
+
+=== "From GitHub (Latest)"
+    ```bash
+    pip install git+https://github.com/inzamol/qv.git
+    qv doctor
+    ```
+
+=== "From Local Codebase"
+    ```bash
+    git clone https://github.com/inzamol/qv.git
+    cd qv
+    pip install -e .
+    # or with uv
+    uv pip install -e .
     ```
 
 === "Run without installing (uvx)"
     ```bash
-    uvx python-qv scan
+    uvx python-qv doctor
     ```
 
 === "Run without installing (pipx)"
     ```bash
-    pipx run python-qv scan
+    pipx run python-qv doctor
     ```
 
 ### 2.1 Live Diagnostic Output

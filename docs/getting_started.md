@@ -4,9 +4,18 @@
 
 ---
 
-## 1. Installation
+## 1. Installation & Execution
 
-Install `python-qv` into your virtual environment or globally via pip or uv (provides the `qv` CLI):
+=== "Ephemeral Run (uvx / pipx)"
+    ```bash
+    # Run project health scorecard
+    uvx python-qv doctor
+    # or
+    pipx run python-qv doctor
+
+    # Run detailed diagnostic scan
+    uvx python-qv scan
+    ```
 
 === "Using uv"
     ```bash
@@ -18,9 +27,35 @@ Install `python-qv` into your virtual environment or globally via pip or uv (pro
     pip install python-qv
     ```
 
-=== "Run directly without installing"
+=== "Using poetry"
     ```bash
-    uvx python-qv scan
+    poetry add python-qv --group dev
+    ```
+
+=== "Global CLI Tool"
+    ```bash
+    # Using uv tool
+    uv tool install python-qv
+
+    # Using pipx
+    pipx install python-qv
+    ```
+
+=== "From GitHub (Latest)"
+    ```bash
+    pip install git+https://github.com/inzamol/qv.git
+    ```
+
+=== "From Local Codebase"
+    ```bash
+    git clone https://github.com/inzamol/qv.git
+    cd qv
+
+    # Using uv
+    uv pip install -e .
+
+    # Using pip
+    pip install -e .
     ```
 
 ---
@@ -49,9 +84,46 @@ exclude = [".venv", "build", "dist"]
 
 ---
 
-## 3. Run a Health Scan (`qv scan`)
+## 3. Run Project Health Doctor (`qv doctor`)
 
-Run `qv scan` in your project root to perform a comprehensive diagnostic audit:
+Get a complete project health report across all 6 core pillars (Dependencies, Security, Packaging, Architecture, Environment, Framework) with progress bars and top priority issues:
+
+```bash
+qv doctor
+```
+
+Example output:
+
+```text
+QV Project Health
+────────────────────────────────────────
+
+Dependencies      92/100   █████████░
+Security           84/100   ████████░░
+Packaging          96/100   ██████████
+Architecture       78/100   ████████░░
+Environment        91/100   █████████░
+Framework          88/100   █████████░
+
+Health Score: 87/100
+
+3 high-priority issues
+7 warnings
+42 checks passed
+
+Top problems:
+  1. SQL-014  N+1 query detected
+  2. DEP-002  Missing dependency: httpx
+  3. ENV-003  Python version mismatch
+
+Run `qv explain SQL-014` for details.
+```
+
+---
+
+## 4. Run Detailed Diagnostic Scan (`qv scan`)
+
+Run `qv scan` in your project root to perform a comprehensive diagnostic audit with full evidence panels:
 
 ```bash
 qv scan
@@ -84,16 +156,16 @@ Health Score: 85/100
 
 ---
 
-## 4. Explore & Remediate Findings
+## 5. Explore & Remediate Findings
 
-### 4.1 Interactive TUI Dashboard (`qv inspect`)
+### 5.1 Interactive TUI Dashboard (`qv inspect`)
 Launch the interactive terminal dashboard to navigate findings, inspect evidence, view dependency trees, and apply fixes with keyboard shortcuts:
 
 ```bash
 qv inspect
 ```
 
-### 4.2 Safe Automated Remediation (`qv fix`)
+### 5.2 Safe Automated Remediation (`qv fix`)
 Safely apply deterministic fixes (such as adding undeclared dependencies or pruning unused packages):
 
 ```bash
@@ -106,7 +178,7 @@ qv fix -y
 
 ---
 
-## 5. Understand Diagnostic Rules (`qv explain`)
+## 6. Understand Diagnostic Rules (`qv explain`)
 
 If a specific diagnostic rule is flagged, you can get in-depth guidance, common causes, and remediation advice:
 
@@ -116,7 +188,7 @@ qv explain DEP-001
 
 ---
 
-## 6. Next Steps
+## 7. Next Steps
 
 - Explore the [CLI Commands Reference](cli_reference.md) for all commands, arguments, and flags.
 - Learn about the [Rules Catalog](rules.md) to understand detected issues.

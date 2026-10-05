@@ -27,6 +27,35 @@ Python projects rarely fail because of syntax errors. They fail because of **eco
 
 Instead of parsing hundreds of lines of cryptic resolver logs, **`qv`** analyzes your project in milliseconds, isolates the root cause, provides concrete evidence, and outputs copy-paste remediation commands.
 
+### Complete Project Health Scorecard (`qv doctor`)
+
+```text
+QV Project Health
+────────────────────────────────────────
+
+Dependencies       92/100   █████████░
+Security           84/100   ████████░░
+Packaging          96/100   ██████████
+Architecture       78/100   ████████░░
+Environment        91/100   █████████░
+Framework          88/100   █████████░
+
+Health Score: 87/100
+
+3 high-priority issues
+7 warnings
+42 checks passed
+
+Top problems:
+  1. SQL-014  N+1 query detected
+  2. DEP-002  Missing dependency: httpx
+  3. ENV-003  Python version mismatch
+
+Run `qv explain SQL-014` for details.
+```
+
+### Deep Diagnostic Evidence Scan (`qv scan`)
+
 ```text
 qv
 Project: payment-service
@@ -52,34 +81,85 @@ Health Score: 85/100
 
 ---
 
-## Installation
+## Installation & Execution
 
-Install `python-qv` via your preferred package manager (provides the `qv` binary):
-
+### 1. Ephemeral Run (Zero Installation Required)
+Run `qv` instantly without installing anything into your environment:
 ```bash
-# Using pip
-pip install python-qv
+# Run health scorecard
+uvx python-qv doctor
+# or
+pipx run python-qv doctor
 
-# Using uv
-uv add python-qv --dev
-
-# Run ephemerally without installing
+# Run detailed scan
 uvx python-qv scan
 # or
 pipx run python-qv scan
+```
+
+### 2. Standard Project Dependency (PyPI)
+Install `python-qv` as a development dependency into your active virtual environment:
+```bash
+# Using uv
+uv add python-qv --dev
+
+# Using pip
+pip install python-qv
+
+# Using poetry
+poetry add python-qv --group dev
+```
+
+### 3. Global CLI Tool Installation
+Install `qv` globally in an isolated environment as a standalone system command:
+```bash
+# Using uv tool
+uv tool install python-qv
+
+# Using pipx
+pipx install python-qv
+```
+
+### 4. Install Latest Development Version (from GitHub)
+Install the latest cutting-edge build directly from the `main` branch:
+```bash
+# With pip
+pip install git+https://github.com/inzamol/qv.git
+
+# With uv tool
+uv tool install git+https://github.com/inzamol/qv.git
+```
+
+### 5. Install from Local Codebase Clone (Editable Mode)
+For development, local testing, and contributing:
+```bash
+git clone https://github.com/inzamol/qv.git
+cd qv
+
+# Using uv
+uv pip install -e .
+
+# Using pip
+pip install -e .
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Run a Health Scan
-Run `qv scan` in the root of any Python repository:
+### 1. Run Complete Project Health Report (`qv doctor`)
+Get a complete project health report across all 6 core pillars in one command:
+```bash
+qv doctor
+```
+
+### 2. Run Detailed Diagnostic Scan (`qv scan`)
+Run a deep diagnostic scan with full evidence panels and remediation commands:
 ```bash
 qv scan
 ```
 
-### 2. Launch the Interactive TUI Explorer
+### 3. Launch the Interactive TUI Explorer
 Navigate findings with keyboard controls, view AST details, and trigger 1-key remediation:
 ```bash
 qv inspect
@@ -87,19 +167,19 @@ qv inspect
 qv ui
 ```
 
-### 3. Generate a Standalone HTML Report
+### 4. Generate a Standalone HTML Report
 Export an interactive HTML dashboard with health metrics, filters, and dark/light modes:
 ```bash
 qv scan --html report.html
 ```
 
-### 4. Explain Any Rule
+### 5. Explain Any Rule
 Get full context, common causes, and remediation advice for any diagnostic rule code:
 ```bash
 qv explain DEP-001
 ```
 
-### 5. Initialize Configuration
+### 6. Initialize Configuration
 Add default configuration rules to `pyproject.toml` without overwriting existing settings:
 ```bash
 qv init
