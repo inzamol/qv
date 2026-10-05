@@ -91,7 +91,12 @@ STANDARD_PILLARS = [
 
 
 def make_bar(score: int, width: int = 10) -> str:
-    """Generate a 10-character unicode block progress bar."""
+    """Return a Unicode block bar of ``width`` characters for a percentage score.
+
+    The filled length is rounded to the nearest integer (ties to even) and
+    clamped to the bar's bounds. Scores outside 0–100 produce empty or full
+    bars; a nonpositive width produces an empty string.
+    """
     filled_count = max(0, min(width, round((score / 100) * width)))
     empty_count = width - filled_count
     return "█" * filled_count + "░" * empty_count
@@ -101,11 +106,29 @@ class DoctorReporter:
     """Generates and renders the signature 'qv doctor' project health scorecard."""
 
     def __init__(self, console: Console | None = None, top_n: int = 3) -> None:
+        """Use the supplied console, or create one with automatic color detection.
+
+        ``top_n`` limits highlighted diagnostics, including repeated rule IDs.
+        Nonpositive values still highlight one problem when findings exist.
+        """
         self.console = console or Console(color_system="auto")
         self.top_n = top_n
 
     def build_report(self, result: ScanResult) -> DoctorReport:
-        """Calculate category health scores and format top problems from ScanResult."""
+        """Build a health scorecard and select top problems from scan findings.
+
+        Category aliases are grouped into six standard pillars, always included.
+        Other categories are included only when they have errors or warnings.
+        Each category starts at 100, loses 15 points per error and 5 per warning,
+        and is floored at zero; informational findings incur no penalty. Overall
+        health is the rounded mean of category scores. Summary counts are copied
+        from ``result.summary``.
+
+        Problems are ordered by descending severity, then confidence, preserving
+        input order for ties. Up to ``top_n`` diagnostics are selected (one for
+        nonpositive limits), and rule IDs may repeat. With no findings, problems
+        are empty and the explanation hint is None.
+        """
         # Group diagnostics by standardized category
         category_counts: dict[str, dict[str, int]] = {
             pillar_id: {"errors": 0, "warnings": 0, "info": 0} for pillar_id, _ in STANDARD_PILLARS

@@ -107,7 +107,23 @@ def doctor_cmd(
     top_n: int = 3,
     output_format: str | None = None,
 ) -> None:
-    """Give a complete project health report and diagnosis."""
+    """Give a complete project health report and diagnosis.
+
+    Print the scorecard, or overwrite --output with a UTF-8 report. SARIF takes
+    precedence over JSON when both are requested. --format enables JSON or SARIF;
+    its other values use the default scorecard unless a format flag is set.
+    --html writes an additional dashboard. --top limits scorecard problems;
+    nonpositive values still show one problem when findings exist.
+
+    --strict and --ci promote warnings to errors. --ci or --github-annotations
+    appends a summary when GITHUB_STEP_SUMMARY is set; summary write failures
+    are ignored. Only --github-annotations emits workflow annotations.
+
+    Raise SystemExit with code 0 on success, 1 for blocking errors (including
+    analyzer failures) or warnings in strict/CI mode, 2 for configuration errors,
+    or 3 for other caught failures, including report file write errors. Click
+    exceptions and existing SystemExit exceptions propagate unchanged.
+    """
     if output_format:
         fmt = output_format.lower()
         if fmt == "json":
