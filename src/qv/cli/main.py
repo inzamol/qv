@@ -34,6 +34,7 @@ from qv.reporters.sarif import SarifReporter
 from qv.reporters.terminal import TerminalReporter
 from qv.rules.registry import RULES_CATALOG, get_rule_definition
 from qv.tui.app import TuiExplorer
+from qv.visualizers.risk_graph import DependencyRiskGraph
 from qv.visualizers.tree import TreeVisualizer
 
 if sys.platform == "win32":
@@ -481,13 +482,82 @@ exclude = [
     default=".",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def dependency_cmd(path: Path) -> None:
-    """Run dependency-focused checks only."""
+@click.option(
+    "--graph",
+    "-g",
+    is_flag=True,
+    help="Visualize annotated dependency risk and usage graph.",
+)
+@click.option(
+    "--risk",
+    "-r",
+    type=click.Choice(
+        ["all", "critical", "high", "medium", "low", "healthy"], case_sensitive=False
+    ),
+    default=None,
+    help="Filter dependency graph by risk level.",
+)
+@click.option(
+    "--depth",
+    "-L",
+    "max_depth",
+    type=int,
+    default=5,
+    help="Maximum depth level for the tree (default: 5).",
+)
+@click.option(
+    "--no-annotate",
+    is_flag=True,
+    help="Hide detailed node annotation metadata.",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output dependency risk graph or scan diagnostics as structured JSON.",
+)
+def dependency_cmd(
+    path: Path,
+    graph: bool,
+    risk: str | None,
+    max_depth: int,
+    no_annotate: bool,
+    as_json: bool,
+) -> None:
+    """Run dependency-focused checks or render annotated dependency risk graph."""
     with _handle_cli_errors("Dependency analysis"):
         project = load_project(path)
         engine = AnalysisEngine(config=project.config, analyzers=[DependencyAnalyzer()])
         result = engine.run(project.context)
-        TerminalReporter(console=console).print_result(result)
+
+        # If user explicitly requests graph or risk filtering
+        if graph or risk is not None:
+            risk_graph = DependencyRiskGraph(
+                context=project.context,
+                diagnostics=result.diagnostics,
+            )
+            if as_json:
+                import json
+
+                click.echo(json.dumps(risk_graph.to_dict(), indent=2))
+                sys.exit(0)
+
+            console.print("\n[bold cyan]Dependency Risk & Usage Graph[/bold cyan]\n")
+            console.print(
+                risk_graph.build_tree(
+                    annotate=not no_annotate,
+                    risk_filter=risk,
+                    max_depth=max_depth,
+                )
+            )
+            console.print()
+            sys.exit(0)
+
+        if as_json:
+            reporter = JsonReporter()
+            click.echo(reporter.render(result))
+        else:
+            TerminalReporter(console=console).print_result(result)
         sys.exit(1 if result.has_blocking_errors else 0)
 
 
@@ -850,6 +920,13 @@ def fix_cmd(
     help="Visualize direct and transitive package dependencies.",
 )
 @click.option(
+    "--risk",
+    "-r",
+    "show_risk",
+    is_flag=True,
+    help="Annotate dependency tree with risk levels, AST imports, and driver classifications.",
+)
+@click.option(
     "--depth",
     "-L",
     "max_depth",
@@ -867,12 +944,32 @@ def tree_cmd(
     path: Path,
     show_imports: bool,
     show_dependencies: bool,
+    show_risk: bool,
     max_depth: int,
     as_json: bool,
 ) -> None:
-    """Visualize dependency trees and import architecture."""
+    """Visualize dependency trees, risk graphs, and import architecture."""
     with _handle_cli_errors("Tree visualization"):
         project = load_project(path)
+
+        if show_risk:
+            engine = AnalysisEngine(config=project.config, analyzers=[DependencyAnalyzer()])
+            result = engine.run(project.context)
+            risk_graph = DependencyRiskGraph(
+                context=project.context,
+                diagnostics=result.diagnostics,
+            )
+            if as_json:
+                import json
+
+                click.echo(json.dumps(risk_graph.to_dict(), indent=2))
+                sys.exit(0)
+
+            console.print("\n[bold cyan]Dependency Risk & Usage Graph[/bold cyan]\n")
+            console.print(risk_graph.build_tree(annotate=True, max_depth=max_depth))
+            console.print()
+            sys.exit(0)
+
         visualizer = TreeVisualizer(context=project.context)
 
         if as_json:
@@ -912,6 +1009,9 @@ def tree_cmd(
 @click.option(
     "--dependencies", "-d", "show_dependencies", is_flag=True, help="Show dependency graph."
 )
+@click.option(
+    "--risk", "-r", "show_risk", is_flag=True, help="Show dependency risk and classification graph."
+)
 @click.option("--depth", "-L", "max_depth", type=int, default=5, help="Maximum tree depth.")
 @click.option("--json", "as_json", is_flag=True, help="Output JSON.")
 @click.pass_context
@@ -920,15 +1020,17 @@ def graph_cmd(
     path: Path,
     show_imports: bool,
     show_dependencies: bool,
+    show_risk: bool,
     max_depth: int,
     as_json: bool,
 ) -> None:
-    """Alias for 'qv tree' command."""
+    """Alias for 'qv tree' command (or dependency risk graph with --risk)."""
     ctx.invoke(
         tree_cmd,
         path=path,
         show_imports=show_imports,
         show_dependencies=show_dependencies,
+        show_risk=show_risk,
         max_depth=max_depth,
         as_json=as_json,
     )

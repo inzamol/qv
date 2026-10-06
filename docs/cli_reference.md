@@ -241,6 +241,7 @@ qv tree [PATH] [OPTIONS]
 |---|---|
 | `-d`, `--dependencies` | Visualizes direct and transitive package dependencies |
 | `-i`, `--imports` | Visualizes internal Python module imports and circular cycles |
+| `-r`, `--risk` | Annotates dependency tree with functional classifications, AST imports, and risk scores |
 | `-L`, `--depth <N>` | Maximum depth level for the tree (default: 5) |
 | `--json` | Emits dependency and import statistics as JSON |
 
@@ -249,6 +250,9 @@ Example:
 ```bash
 # View full project tree (dependencies and imports)
 qv tree
+
+# View dependency risk and usage graph
+qv tree --risk
 
 # View only internal module import hierarchy and circular loops
 qv tree --imports
@@ -282,10 +286,29 @@ qv explain DJG-004
 Run focused checks on specific areas without executing the full scan:
 
 ### 10.1 `qv dependency`
-Scans for dependency conflicts, missing imports, unused packages, and version mismatches.
+Scans for dependency conflicts, missing imports, unused packages, and version mismatches, or renders an annotated Dependency Risk Graph.
 
 ```bash
-qv dependency [PATH]
+qv dependency [PATH] [OPTIONS]
+```
+
+Options:
+- `-g, --graph`: Render annotated dependency risk and functional usage graph.
+- `-r, --risk [all|critical|high|medium|low|healthy]`: Filter dependency graph by risk level.
+- `-L, --depth <N>`: Maximum depth level for the tree (default: 5).
+- `--no-annotate`: Render compact dependency graph without multi-line annotation details.
+- `--json`: Output scan results or dependency risk graph as structured JSON.
+
+Example:
+```bash
+# Run dependency diagnostic checks
+qv dependency
+
+# Render annotated dependency risk graph
+qv dependency --graph
+
+# Filter dependency graph for critical/high risks only
+qv dependency --graph --risk high
 ```
 
 ### 10.2 `qv environment`
