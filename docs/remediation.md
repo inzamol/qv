@@ -9,10 +9,15 @@ Unlike aggressive tools that rewrite code unpredictably, `qv fix` computes deter
 ## 1. Basic Usage
 
 ```bash
-# Interactive wizard (prompts before applying each fix)
-qv fix
+# Preview proposed unified color diffs without modifying files
+qv fix --diff
 
-# Preview proposed file diffs without touching disk
+# Interactive confirmation prompt before applying each individual fix
+qv fix -i
+# or
+qv fix --interactive
+
+# Preview proposed plan in tabular dry-run mode
 qv fix --dry-run
 
 # Automatically apply all safe fixes without prompting
@@ -27,9 +32,48 @@ qv fix --sync -y
 
 ---
 
-## 2. Safety Guarantees & Remediation Levels
+## 2. Unified Diff Preview Mode (`--diff`)
 
-`qv` classifies fixes into three safety categories:
+Before modifying any files on disk, inspect the exact line-by-line changes `qv fix` proposes using `--diff`:
+
+```bash
+qv fix --diff
+```
+
+```diff
+--- pyproject.toml
++++ pyproject.toml
+@@ -8,6 +8,7 @@
+ dependencies = [
+     "click>=8.0.0",
+     "rich>=13.0.0",
++    "httpx>=0.27.0",
+ ]
+```
+
+---
+
+## 3. Interactive Remediation (`-i` / `--interactive`)
+
+Run fixes in interactive step-through mode where each individual diagnostic fix prompts for your explicit approval before mutating configuration or source code:
+
+```bash
+qv fix -i
+```
+
+```text
+[1/2] Apply fix for DEP-002 (Add 'httpx' to pyproject.toml)? [y/N]: y
+  + Successfully applied fix to pyproject.toml
+
+[2/2] Apply fix for PKG-001 (Initialize pyproject.toml metadata)? [y/N]: n
+  - Skipped fix for PKG-001
+```
+
+---
+
+## 4. Safety Guarantees & Remediation Levels
+
+`qv` classifies fixes into four safety categories:
 
 | Fix Category | Example | Behavior |
 |---|---|---|
@@ -40,9 +84,9 @@ qv fix --sync -y
 
 ---
 
-## 3. Remediation Plan Inspection (Dry Run)
+## 5. Remediation Plan Inspection (Dry Run)
 
-Running `qv fix --dry-run` displays a table of planned actions and exact file diffs:
+Running `qv fix --dry-run` displays a structured table of planned actions:
 
 ```text
 Found 2 actionable fix(es) (2 safe):
@@ -59,7 +103,7 @@ Dry-run mode enabled. No changes written to disk.
 
 ---
 
-## 4. Package Manager Auto-Sync
+## 6. Package Manager Auto-Sync
 
 When dependencies are modified, running `qv fix --sync` automatically calls the detected package manager (`uv sync`, `poetry install`, `pip install`) to keep your active virtual environment in lockstep:
 

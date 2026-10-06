@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from qv.analyzers.ci.analyzer import CIAnalyzer
 from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
 from qv.analyzers.docker.analyzer import DockerAnalyzer
 from qv.analyzers.environment.drift import EnvironmentAnalyzer
@@ -23,6 +24,8 @@ from qv.core.models import (
     Severity,
     Suggestion,
 )
+from qv.frameworks.celery import CeleryAnalyzer
+from qv.frameworks.django import DjangoAnalyzer
 from qv.frameworks.fastapi import FastApiAnalyzer
 from qv.frameworks.sqlalchemy import SqlAlchemyAnalyzer
 
@@ -43,10 +46,13 @@ class AnalysisEngine:
                 PackagingAnalyzer(),
                 EnvironmentAnalyzer(),
                 DockerAnalyzer(),
+                CIAnalyzer(),
                 DependencyAnalyzer(),
                 ImportAnalyzer(),
                 SecurityAnalyzer(),
                 FastApiAnalyzer(),
+                DjangoAnalyzer(),
+                CeleryAnalyzer(),
                 SqlAlchemyAnalyzer(),
             ]
 

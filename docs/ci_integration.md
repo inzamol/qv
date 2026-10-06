@@ -52,7 +52,51 @@ jobs:
 
 ---
 
-### 2.2 GitHub Code Scanning with SARIF
+### 2.2 Baseline & Differential Scanning (Prevent New Regressions)
+
+For large existing codebases with pre-existing warnings or technical debt, use baseline snapshots so CI only fails on **new** diagnostic issues introduced in pull requests:
+
+```yaml
+name: CI (Baseline Verification)
+
+on: [push, pull_request]
+
+jobs:
+  qv-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+
+      # Verify that no new issues exist beyond .qv-baseline.json
+      - name: Verify QV Baseline
+        run: uv run qv baseline verify --strict
+```
+
+Or pass `--baseline` to standard scans:
+```bash
+uv run qv scan --ci --baseline .qv-baseline.json
+```
+
+---
+
+### 2.3 CI/CD Workflow & Dockerfile Auditing
+
+Add targeted health audits to ensure your CI workflows and Docker environments conform to production security best practices:
+
+```yaml
+      # Audit GitHub Actions workflow definitions
+      - name: Audit CI Workflows
+        run: uv run qv ci
+
+      # Audit Dockerfiles and docker-compose configurations
+      - name: Audit Docker Assets
+        run: uv run qv docker
+```
+
+---
+
+### 2.4 GitHub Code Scanning with SARIF
 
 `qv` supports emitting findings in **SARIF v2.1.0** format for GitHub Advanced Security and Code Scanning:
 
