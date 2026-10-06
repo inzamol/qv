@@ -546,3 +546,96 @@
 - **Default Severity:** `WARNING`
 - **Description:** A Python source file contains invalid syntax and could not be parsed into an AST.
 - **Remediation:** Fix the syntax error in the source file.
+
+---
+
+## 11. CI/CD Workflow Rules (`CI-xxx`)
+
+### 11.1 CI-001: CI Python Matrix Version Mismatch
+- **Default Severity:** `WARNING`
+- **Description:** CI workflow tests Python versions incompatible with declared project `requires-python` or classifiers in `pyproject.toml`.
+- **Remediation:** Align CI test matrix versions with supported project Python ranges.
+
+### 11.2 CI-002: Unfrozen Dependency Installation in CI
+- **Default Severity:** `WARNING`
+- **Description:** CI workflow installs dependencies without lockfiles or hash verification.
+- **Remediation:** Use lockfiles (e.g. `uv sync --frozen`, `poetry install --sync`, or `pip-sync`) in CI workflows.
+
+### 11.3 CI-003: Deprecated or Outdated CI Action Version
+- **Default Severity:** `INFO`
+- **Description:** Workflow references a deprecated or end-of-life GitHub Actions version (e.g. `actions/checkout@v2`, `actions/setup-python@v3`).
+- **Remediation:** Upgrade GitHub Actions to current stable major releases (e.g. `actions/checkout@v4`, `actions/setup-python@v5`).
+
+### 11.4 CI-004: Missing Test or Quality Gate in CI Workflow
+- **Default Severity:** `INFO`
+- **Description:** Pull request / push workflow contains no test suite, linter, or health checks.
+- **Remediation:** Add automated test or lint steps (e.g. `pytest`, `ruff`, `qv scan --ci`).
+
+### 11.5 CI-005: Insecure Secret or Token in CI Workflow
+- **Default Severity:** `ERROR`
+- **Description:** Potential plaintext secret or token literal detected in workflow file.
+- **Remediation:** Store credentials in repository secrets (`${{ secrets.MY_SECRET }}`).
+
+### 11.6 CI-006: Missing Concurrency Cancellation in PR Workflow
+- **Default Severity:** `INFO`
+- **Description:** Pull request workflow lacks concurrency cancellation, causing redundant runner minutes on repeated pushes.
+- **Remediation:** Add concurrency group with `cancel-in-progress: true`.
+
+---
+
+## 12. Django Framework Rules (`DJG-xxx`)
+
+### 12.1 DJG-001: Insecure Hardcoded DEBUG = True in Django Settings
+- **Default Severity:** `ERROR`
+- **Description:** Django settings hardcodes `DEBUG = True` without environment variable fallback, risking sensitive traceback exposure.
+- **Remediation:** Load DEBUG dynamically from an environment variable: `DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'`.
+
+### 12.2 DJG-002: Hardcoded SECRET_KEY in Django Settings
+- **Default Severity:** `ERROR`
+- **Description:** Hardcoded SECRET_KEY literal detected in settings. Secrets must be loaded from environment variables or vault.
+- **Remediation:** Load SECRET_KEY from environment: `SECRET_KEY = os.environ['DJANGO_SECRET_KEY']`.
+
+### 12.3 DJG-003: Insecure Wildcard ALLOWED_HOSTS in Django Settings
+- **Default Severity:** `WARNING`
+- **Description:** `ALLOWED_HOSTS` contains wildcard `'*'` allowing Host header poisoning in production.
+- **Remediation:** Explicitly define allowed domain names or load from environment.
+
+### 12.4 DJG-004: Potential N+1 Database Query in Loop
+- **Default Severity:** `WARNING`
+- **Description:** QuerySet execution inside loop causes N+1 query overhead.
+- **Remediation:** Prefetch related relations before looping: `queryset.prefetch_related('...')` or `select_related('...')`.
+
+### 12.5 DJG-005: Django ForeignKey Missing Explicit on_delete
+- **Default Severity:** `WARNING`
+- **Description:** `models.ForeignKey` declared without required `on_delete` argument.
+- **Remediation:** Specify explicit on_delete behavior: `models.CASCADE`, `models.PROTECT`, or `models.SET_NULL`.
+
+### 12.6 DJG-006: Missing CSRF Protection Middleware
+- **Default Severity:** `WARNING`
+- **Description:** `MIDDLEWARE` list is missing `'django.middleware.csrf.CsrfViewMiddleware'`.
+- **Remediation:** Add `'django.middleware.csrf.CsrfViewMiddleware'` to `MIDDLEWARE`.
+
+---
+
+## 13. Celery Framework Rules (`CEL-xxx`)
+
+### 13.1 CEL-001: Insecure Celery Pickle Serializer Enabled
+- **Default Severity:** `ERROR`
+- **Description:** Celery serializer setting uses `'pickle'`, allowing arbitrary code execution if brokers are compromised.
+- **Remediation:** Use secure serialization formats like `'json'` or `'msgpack'`.
+
+### 13.2 CEL-002: Missing Task Timeout Limits in Celery Task
+- **Default Severity:** `WARNING`
+- **Description:** Celery task has no `time_limit` or `soft_time_limit` configured.
+- **Remediation:** Specify `time_limit` and `soft_time_limit` on task decorator: `@shared_task(time_limit=300, soft_time_limit=240)`.
+
+### 13.3 CEL-003: Unbounded Retry Policy on Celery Task
+- **Default Severity:** `WARNING`
+- **Description:** Celery task permits unlimited retries, risking broker congestion and infinite retry loops.
+- **Remediation:** Set explicit `max_retries` (e.g. `max_retries=3, default_retry_delay=60`).
+
+### 13.4 CEL-004: Blocking time.sleep() in Asynchronous Celery Task
+- **Default Severity:** `WARNING`
+- **Description:** Async Celery task invokes `time.sleep()`, blocking the async event loop.
+- **Remediation:** Use `await asyncio.sleep()` instead of `time.sleep()`.
+

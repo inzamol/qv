@@ -13,17 +13,19 @@ from rich.panel import Panel
 from rich.table import Table
 
 from qv import __version__
+from qv.analyzers.ci.analyzer import CIAnalyzer
 from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
 from qv.analyzers.docker.analyzer import DockerAnalyzer
 from qv.analyzers.environment.drift import EnvironmentAnalyzer
 from qv.analyzers.imports.analyzer import ImportAnalyzer
+from qv.core.baseline import filter_against_baseline, load_baseline_fingerprints, save_baseline
 from qv.core.config import ConfigurationError
 from qv.core.engine import AnalysisEngine
 from qv.core.models import ScanResult, Severity
 from qv.core.project import load_project
 from qv.frameworks import AVAILABLE_FRAMEWORK_ANALYZERS
 from qv.remediation.engine import RemediationEngine
-from qv.remediation.models import FixActionType
+from qv.remediation.models import FixActionType, FixPlan
 from qv.reporters.doctor_reporter import DoctorReporter
 from qv.reporters.github_annotator import GitHubAnnotator
 from qv.reporters.html_reporter import HtmlReporter
@@ -75,6 +77,7 @@ def _run_analysis_pipeline(
     min_severity: str | None = None,
     html_output: Path | None = None,
     github_annotations: bool = False,
+    baseline_path: Path | None = None,
 ) -> ScanResult:
     """Load project context, apply configuration flags, execute engine, and emit annotations/HTML."""
     project = load_project(path)
@@ -92,6 +95,20 @@ def _run_analysis_pipeline(
 
     engine = AnalysisEngine(config=config)
     result = engine.run(project.context)
+
+    if baseline_path and baseline_path.exists() and baseline_path.is_file():
+        fps = load_baseline_fingerprints(baseline_path)
+        new_diags, suppressed = filter_against_baseline(result.diagnostics, fps)
+        result = ScanResult.create(
+            project_name=result.project_name,
+            project_path=result.project_path,
+            python_version=result.python_version,
+            package_manager=result.package_manager,
+            diagnostics=new_diags,
+            checks_passed=result.summary.checks_passed + suppressed,
+            root_causes=result.root_causes,
+            analyzer_results=result.analyzer_results,
+        )
 
     if github_annotations or ci_mode:
         annotator = GitHubAnnotator()
@@ -169,6 +186,13 @@ def cli() -> None:
     help="Emit GitHub Actions inline workflow command annotations.",
 )
 @click.option(
+    "--baseline",
+    "baseline_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Filter findings against existing baseline snapshot.",
+)
+@click.option(
     "--top",
     "top_n",
     type=int,
@@ -193,6 +217,7 @@ def doctor_cmd(
     offline: bool,
     html_output: Path | None,
     github_annotations: bool,
+    baseline_path: Path | None = None,
     top_n: int = 3,
     output_format: str | None = None,
 ) -> None:
@@ -228,6 +253,7 @@ def doctor_cmd(
             offline=offline,
             html_output=html_output,
             github_annotations=github_annotations,
+            baseline_path=baseline_path,
         )
 
         doctor_reporter = DoctorReporter(console=console, top_n=top_n)
@@ -281,6 +307,13 @@ def doctor_cmd(
     help="Emit GitHub Actions inline workflow command annotations.",
 )
 @click.option(
+    "--baseline",
+    "baseline_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Filter findings against existing baseline snapshot.",
+)
+@click.option(
     "--hide-warnings",
     "--no-warnings",
     "-W",
@@ -318,6 +351,7 @@ def scan(
     offline: bool,
     html_output: Path | None,
     github_annotations: bool,
+    baseline_path: Path | None = None,
     hide_warnings: bool = False,
     errors_only: bool = False,
     min_severity: str | None = None,
@@ -342,6 +376,7 @@ def scan(
             min_severity=min_severity,
             html_output=html_output,
             github_annotations=github_annotations,
+            baseline_path=baseline_path,
         )
 
         rendered = (
@@ -504,6 +539,97 @@ def docker_cmd(path: Path) -> None:
         sys.exit(1 if result.has_blocking_errors else 0)
 
 
+@cli.command("ci")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+def ci_cmd(path: Path) -> None:
+    """Run CI/CD workflow checks only."""
+    with _handle_cli_errors("CI workflow analysis"):
+        project = load_project(path)
+        engine = AnalysisEngine(config=project.config, analyzers=[CIAnalyzer()])
+        result = engine.run(project.context)
+        TerminalReporter(console=console).print_result(result)
+        sys.exit(1 if result.has_blocking_errors else 0)
+
+
+@cli.group("baseline")
+def baseline_group() -> None:
+    """Manage diagnostic baseline snapshots for legacy codebases."""
+    pass
+
+
+@baseline_group.command("record")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path(".qv-baseline.json"),
+    help="Target baseline snapshot file (default: .qv-baseline.json).",
+)
+def baseline_record_cmd(path: Path, output: Path) -> None:
+    """Record current diagnostic snapshot into baseline file."""
+    with _handle_cli_errors("Baseline recording"):
+        project = load_project(path)
+        engine = AnalysisEngine(config=project.config)
+        result = engine.run(project.context)
+        save_baseline(result, output)
+        console.print(
+            f"[bold green]✓ Recorded {len(result.diagnostics)} diagnostic finding(s) into baseline {output}[/bold green]"
+        )
+        sys.exit(0)
+
+
+@baseline_group.command("verify")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--baseline",
+    "-b",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path(".qv-baseline.json"),
+    help="Path to baseline snapshot file (default: .qv-baseline.json).",
+)
+@click.option("--strict", is_flag=True, help="Fail if any new diagnostics are detected.")
+def baseline_verify_cmd(path: Path, baseline: Path, strict: bool) -> None:
+    """Verify project against baseline snapshot, reporting only newly introduced violations."""
+    with _handle_cli_errors("Baseline verification"):
+        project = load_project(path)
+        engine = AnalysisEngine(config=project.config)
+        result = engine.run(project.context)
+        fps = load_baseline_fingerprints(baseline)
+        new_diags, suppressed = filter_against_baseline(result.diagnostics, fps)
+
+        filtered_result = ScanResult.create(
+            project_name=result.project_name,
+            project_path=result.project_path,
+            python_version=result.python_version,
+            package_manager=result.package_manager,
+            diagnostics=new_diags,
+            checks_passed=result.summary.checks_passed + suppressed,
+            root_causes=result.root_causes,
+            analyzer_results=result.analyzer_results,
+        )
+        TerminalReporter(console=console).print_result(filtered_result)
+        if suppressed:
+            console.print(f"[dim]({suppressed} baseline findings suppressed)[/dim]\n")
+        if filtered_result.has_blocking_errors or (
+            strict and filtered_result.summary.warnings_count > 0
+        ):
+            sys.exit(1)
+        sys.exit(0)
+
+
 @cli.command("fix")
 @click.argument(
     "path",
@@ -514,6 +640,17 @@ def docker_cmd(path: Path) -> None:
     "--dry-run",
     is_flag=True,
     help="Display proposed fixes and diffs without modifying any files.",
+)
+@click.option(
+    "--diff",
+    is_flag=True,
+    help="Show unified diff preview of proposed file modifications.",
+)
+@click.option(
+    "-i",
+    "--interactive",
+    is_flag=True,
+    help="Interactively review and select each individual fix.",
 )
 @click.option(
     "-y",
@@ -538,6 +675,8 @@ def docker_cmd(path: Path) -> None:
 def fix_cmd(
     path: Path,
     dry_run: bool,
+    diff: bool,
+    interactive: bool,
     auto_approve: bool,
     rule_filter: str | None,
     execute_sync: bool,
@@ -594,11 +733,38 @@ def fix_cmd(
 
         console.print(table)
 
+        if diff:
+            console.print("\n[bold cyan]Proposed File Diffs:[/bold cyan]")
+            for act in plan.actions:
+                if act.diff:
+                    console.print(
+                        Panel(
+                            act.diff,
+                            title=f"[yellow]{act.rule_id}[/yellow] — {act.target_file or 'command'}",
+                            border_style="dim",
+                        )
+                    )
+
         if dry_run:
             console.print("\n[yellow]Dry-run mode enabled. No changes written to disk.[/yellow]")
             sys.exit(0)
 
-        if auto_approve:
+        if interactive:
+            selected_actions = []
+            for act in plan.actions:
+                if click.confirm(
+                    f"Apply fix for [{act.rule_id}] on {act.target_file or 'command'} ({act.description})?",
+                    default=act.is_safe,
+                ):
+                    selected_actions.append(act)
+            plan = FixPlan(project_path=plan.project_path, actions=selected_actions)
+            result = remediation_engine.apply_plan(
+                plan,
+                dry_run=False,
+                execute_commands=execute_sync,
+                only_safe=False,
+            )
+        elif auto_approve:
             result = remediation_engine.apply_plan(
                 plan,
                 dry_run=False,
@@ -803,7 +969,7 @@ def framework_cmd(path: Path, name: str | None, as_json: bool, as_sarif: bool) -
 
         if not analyzers_to_run:
             console.print(
-                f"[bold red]Unknown framework '{name}'. Available: fastapi, sqlalchemy[/bold red]"
+                f"[bold red]Unknown framework '{name}'. Available: fastapi, sqlalchemy, django, celery[/bold red]"
             )
             sys.exit(2)
 
