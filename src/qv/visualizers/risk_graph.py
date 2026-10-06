@@ -226,50 +226,72 @@ class DependencyRiskGraph:
     def _assess_risk(self, node: DependencyNodeInfo) -> tuple[RiskLevel, list[str]]:
         """Compute the risk level and reasons for a node."""
         reasons: list[str] = []
-        max_severity = None
+        highest_risk = RiskLevel.HEALTHY
 
-        # Check diagnostics
-        for diag in node.diagnostics:
-            if diag.id == "DEP-006":
-                reasons.append(f"Vulnerability advisory: {diag.title}")
-                return RiskLevel.CRITICAL, reasons
-            if diag.id == "DEP-001":
-                reasons.append("Dependency version constraint conflict")
-                return RiskLevel.HIGH, reasons
-            if diag.id == "DEP-002":
-                reasons.append("Imported in code but missing from pyproject.toml")
-                return RiskLevel.MEDIUM, reasons
-            if diag.id == "DEP-004":
-                reasons.append("Python runtime compatibility mismatch")
-                return RiskLevel.MEDIUM, reasons
-            if diag.id == "DEP-003":
-                reasons.append("Declared dependency with no direct import in source AST")
-                if max_severity is None:
-                    max_severity = RiskLevel.LOW
-            elif diag.severity == Severity.ERROR:
-                reasons.append(diag.title)
-                return RiskLevel.HIGH, reasons
-            elif diag.severity == Severity.WARNING:
-                reasons.append(diag.title)
-                if max_severity is None or max_severity == RiskLevel.LOW:
-                    max_severity = RiskLevel.MEDIUM
+        risk_scores = {
+            RiskLevel.CRITICAL: 4,
+            RiskLevel.HIGH: 3,
+            RiskLevel.MEDIUM: 2,
+            RiskLevel.LOW: 1,
+            RiskLevel.HEALTHY: 0,
+        }
 
-        if not node.is_direct and node.is_imported:
-            reasons.append("Imported directly in source code but only declared transitively")
-            return RiskLevel.MEDIUM, reasons
+        def _update_risk(level: RiskLevel, reason: str) -> None:
+            nonlocal highest_risk
+            reasons.append(reason)
+            if risk_scores[level] > risk_scores[highest_risk]:
+                highest_risk = level
 
-        if node.is_direct and not node.is_imported and node.role == DependencyRole.LIBRARY:
-            reasons.append("Direct dependency without direct import (review for unused/driver)")
-            return RiskLevel.LOW, reasons
+        # 1. Evaluate all diagnostics attached to this package
+        if node.diagnostics:
+            for diag in node.diagnostics:
+                if diag.id == "DEP-006":
+                    _update_risk(RiskLevel.CRITICAL, f"Vulnerability advisory: {diag.title}")
+                elif diag.id == "DEP-001":
+                    _update_risk(RiskLevel.HIGH, "Dependency version constraint conflict")
+                elif diag.id == "DEP-002":
+                    _update_risk(
+                        RiskLevel.MEDIUM, "Imported in code but missing from pyproject.toml"
+                    )
+                elif diag.id == "DEP-004":
+                    _update_risk(RiskLevel.MEDIUM, "Python runtime compatibility mismatch")
+                elif diag.id == "DEP-003":
+                    _update_risk(
+                        RiskLevel.LOW, "Declared dependency with no direct import in source AST"
+                    )
+                elif diag.severity == Severity.ERROR:
+                    _update_risk(RiskLevel.HIGH, f"Finding {diag.id}: {diag.title}")
+                elif diag.severity == Severity.WARNING:
+                    _update_risk(RiskLevel.MEDIUM, f"Finding {diag.id}: {diag.title}")
 
-        if node.version is None:
-            reasons.append("Declared in pyproject.toml but not installed in active environment")
-            return RiskLevel.HIGH, reasons
+        # 2. Check installation and import heuristics when no specific diagnostic exists
+        else:
+            if node.version is None:
+                _update_risk(
+                    RiskLevel.HIGH,
+                    "Declared in pyproject.toml but not installed in active environment",
+                )
+            elif not node.is_direct and node.is_imported:
+                _update_risk(
+                    RiskLevel.MEDIUM,
+                    "Imported directly in source code but only declared transitively",
+                )
+            elif node.is_direct and not node.is_imported and node.role == DependencyRole.LIBRARY:
+                _update_risk(
+                    RiskLevel.LOW,
+                    "Direct dependency without direct import (review for unused/driver)",
+                )
 
-        if max_severity:
-            return max_severity, reasons
+        if node.version is None and node.diagnostics:
+            _update_risk(
+                RiskLevel.HIGH,
+                "Declared in pyproject.toml but not installed in active environment",
+            )
 
-        return RiskLevel.HEALTHY, ["No diagnostic issues found; dependency is healthy"]
+        if highest_risk == RiskLevel.HEALTHY:
+            return RiskLevel.HEALTHY, ["No diagnostic issues found; dependency is healthy"]
+
+        return highest_risk, reasons
 
     def build_tree(
         self,
