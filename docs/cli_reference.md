@@ -80,6 +80,7 @@ Run `qv explain SQL-014` for details.
 |---|---|
 | `--strict` | Promotes warnings to errors (fails CI if any warnings exist) |
 | `--ci` | Runs non-interactively with strict mode enabled |
+| `--baseline <FILE>` | Filter findings against an established baseline file (ignores pre-existing issues) |
 | `--json` | Emits doctor health scorecard as structured JSON |
 | `--sarif` | Emits scan results as standard SARIF v2.1.0 format |
 | `--top <N>` | Number of top problems to highlight (default: 3) |
@@ -111,6 +112,7 @@ qv scan [PATH] [OPTIONS]
 |---|---|
 | `--strict` | Promotes warnings to errors (fails CI if any warnings exist) |
 | `--ci` | Runs non-interactively with strict mode enabled |
+| `--baseline <FILE>` | Filter findings against an established baseline file (ignores pre-existing issues) |
 | `--json` | Emits scan results as structured JSON |
 | `--sarif` | Emits scan results as standard SARIF v2.1.0 format |
 | `--format`, `-f <FORMAT>` | Specify output format (`json`, `sarif`, `html`, `terminal`, `text`) |
@@ -168,6 +170,8 @@ qv fix [PATH] [OPTIONS]
 | Option | Description |
 |---|---|
 | `--dry-run` | Shows proposed fixes and diffs without modifying any files |
+| `--diff` | Shows unified color diff of proposed file modifications before applying |
+| `-i`, `--interactive` | Prompts for interactive confirmation before applying each fix |
 | `-y`, `--yes` | Automatically applies all safe fixes without interactive confirmation |
 | `--rule <RULE_ID>` | Filters remediation to a specific rule ID (e.g. `DEP-002`) |
 | `--sync` | Runs suggested package manager install/sync commands |
@@ -175,7 +179,13 @@ qv fix [PATH] [OPTIONS]
 Example:
 
 ```bash
-# Preview proposed fixes
+# Preview proposed unified diffs
+qv fix --diff
+
+# Apply fixes with interactive confirmation per finding
+qv fix -i
+
+# Preview proposed fixes in dry-run mode
 qv fix --dry-run
 
 # Apply all safe fixes automatically
@@ -184,7 +194,40 @@ qv fix -y
 
 ---
 
-## 7. `qv tree` / `qv graph`
+## 7. `qv baseline`
+
+Manages baseline snapshots (`.qv-baseline.json`) of known diagnostic issues to enable differential scanning in legacy codebases without failing CI on pre-existing debt.
+
+```bash
+qv baseline record [PATH] [OPTIONS]
+qv baseline verify [PATH] [OPTIONS]
+```
+
+### 7.1 Subcommands
+
+#### `qv baseline record`
+Records current diagnostic findings into a baseline JSON file:
+```bash
+# Record baseline to default .qv-baseline.json
+qv baseline record
+
+# Record baseline to a custom file
+qv baseline record -o custom-baseline.json
+```
+
+#### `qv baseline verify`
+Verifies that no new diagnostic issues have been introduced beyond the baseline:
+```bash
+# Verify against default .qv-baseline.json
+qv baseline verify
+
+# Verify in strict mode against a specific baseline file
+qv baseline verify -b custom-baseline.json --strict
+```
+
+---
+
+## 8. `qv tree` / `qv graph`
 
 Visualizes direct vs transitive package dependencies and internal source module import architecture (with circular import cycles highlighted).
 
@@ -192,7 +235,7 @@ Visualizes direct vs transitive package dependencies and internal source module 
 qv tree [PATH] [OPTIONS]
 ```
 
-### 7.1 Options
+### 8.1 Options
 
 | Option | Description |
 |---|---|
@@ -216,7 +259,7 @@ qv tree -d -L 2
 
 ---
 
-## 8. `qv explain`
+## 9. `qv explain`
 
 Displays detailed explanations, evidence requirements, and remediation instructions for a rule.
 
@@ -228,44 +271,60 @@ Example:
 
 ```bash
 qv explain DEP-002
+qv explain CI-001
+qv explain DJG-004
 ```
 
 ---
 
-## 9. Targeted Subsystem Commands
+## 10. Targeted Subsystem Commands
 
 Run focused checks on specific areas without executing the full scan:
 
-### 8.1 `qv dependency`
+### 10.1 `qv dependency`
 Scans for dependency conflicts, missing imports, unused packages, and version mismatches.
 
 ```bash
 qv dependency [PATH]
 ```
 
-### 8.2 `qv environment`
+### 10.2 `qv environment`
 Checks for Python runtime drift between local environment, Dockerfiles, and CI matrices.
 
 ```bash
 qv environment [PATH]
 ```
 
-### 8.3 `qv architecture`
+### 10.3 `qv architecture`
 Scans source code for circular imports and unresolved internal modules.
 
 ```bash
 qv architecture [PATH]
 ```
 
-### 8.4 `qv framework` (alias: `qv frameworks`)
-Runs framework-specific diagnostic rules (e.g. FastAPI async blocking calls, SQLAlchemy N+1 queries, unclosed sessions, SQL injection, pool leaks).
+### 10.4 `qv docker`
+Audits Dockerfiles and docker-compose configurations for security best practices, root user risks, unpinned base images, sensitive file leaks, and cache optimization (`DOC-001` - `DOC-014`).
+
+```bash
+qv docker [PATH]
+```
+
+### 10.5 `qv ci`
+Audits Continuous Integration workflows (`.github/workflows/*.yml`) for matrix mismatches, unpinned dependencies, outdated GitHub Actions, missing test/lint quality gates, hardcoded secrets, and missing concurrency cancellation (`CI-001` - `CI-006`).
+
+```bash
+qv ci [PATH]
+```
+
+### 10.6 `qv framework` (alias: `qv frameworks`)
+Runs framework-specific diagnostic rules for FastAPI, SQLAlchemy, Django, and Celery.
 
 ```bash
 qv framework [PATH] [OPTIONS]
 ```
 
 Options:
-- `-n, --name [fastapi|sqlalchemy|sql|all]`: Filter analysis to a specific framework (default: all detected frameworks).
+- `-n, --name [fastapi|sqlalchemy|django|celery|sql|all]`: Filter analysis to a specific framework (default: all detected frameworks).
 - `--json`: Output framework scan results as structured JSON.
 - `--sarif`: Output framework scan results in SARIF v2.1.0 format.
 
@@ -276,6 +335,12 @@ qv framework
 
 # Scan specifically for FastAPI issues
 qv framework --name fastapi
+
+# Scan specifically for Django issues
+qv framework --name django
+
+# Scan specifically for Celery issues
+qv framework --name celery
 
 # Scan specifically for SQLAlchemy / SQL database issues
 qv framework --name sqlalchemy

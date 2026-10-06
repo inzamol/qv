@@ -172,6 +172,9 @@ Health Score: 85/100
 | **Environment** | Interpreter version drift, Dockerfile base image mismatches, CI matrix synchronization | `ENV-001` through `ENV-003` |
 | **Architecture** | Circular import cycle detection, unresolvable module imports, dead orphan files, deprecated stdlib | `IMP-001` through `IMP-004` |
 | **Packaging** | PEP 621 metadata validation, TOML syntax verification, entrypoint checks | `PKG-001`, `PKG-002` |
+| **Docker** | Security best practices, root user risks, unpinned base images, sensitive file leaks | `DOC-001` through `DOC-014` |
+| **CI Workflows** | Matrix mismatches, unpinned dependencies, outdated GitHub Actions, quality gates, hardcoded secrets | `CI-001` through `CI-006` |
+| **Frameworks** | FastAPI (`FAP-xxx`), SQLAlchemy (`SQL-xxx`), Django (`DJG-xxx`), Celery (`CEL-xxx`) | `FAP`, `SQL`, `DJG`, `CEL` |
 
 👉 *Browse full rule descriptions and remediation strategies in the [Rules Catalog](rules.md).*
 

@@ -385,14 +385,18 @@ qv inspect ./services/backend --offline
 
 Safely and automatically apply deterministic configuration and code fixes.
 
-#### Dry-Run Mode
-Preview proposed file modifications and shell commands without writing changes to disk:
+#### Dry-Run & Diff Preview Mode
+Preview proposed file modifications, shell commands, or unified diffs without writing changes to disk:
 
 ```bash
+# Preview proposed actions in tabular dry-run mode
 qv fix --dry-run
+
+# Preview unified color diff of proposed file modifications
+qv fix --diff
 ```
 
-**Terminal Output:**
+**Terminal Output (`qv fix --dry-run`):**
 ```text
 Found 2 actionable fix(es) (2 safe):
 
@@ -407,8 +411,11 @@ Proposed Fixes
 Dry-run mode enabled. No changes written to disk.
 ```
 
-#### Applying Fixes
+#### Applying Fixes (Interactive & Automated)
 ```bash
+# Apply fixes interactively with approval prompts per finding
+qv fix -i
+
 # Apply all safe fixes without interactive confirmation prompts
 qv fix -y
 
@@ -429,31 +436,30 @@ Successfully applied 1 fix(es):
 
 ---
 
-### 4. Dependency & Import Architecture Visualizer (`qv tree` / `qv graph`)
+### 4. Baseline & Differential Scanning (`qv baseline`)
+
+Track and verify diagnostic baselines (`.qv-baseline.json`) in legacy codebases so CI only fails on new regressions:
+
+```bash
+# Record current findings as baseline
+qv baseline record
+
+# Verify in CI that no new issues have been introduced
+qv baseline verify --strict
+
+# Or run scan filtering against established baseline
+qv scan --ci --baseline .qv-baseline.json
+```
+
+---
+
+### 5. Dependency & Import Architecture Visualizer (`qv tree` / `qv graph`)
 
 Render structured visual trees of package dependencies and internal source module import architecture.
 
 #### Full Hierarchy Overview
 ```bash
 qv tree
-```
-
-**Terminal Output:**
-```text
-Dependency Hierarchy
-└── fastapi (0.115.0)
-    ├── pydantic (2.9.2)
-    │   └── pydantic-core (2.23.4)
-    ├── starlette (0.38.6)
-    │   └── anyio (4.6.0)
-    └── typing-extensions (4.12.2)
-
-Internal Module Import Architecture
-└── app.main
-    ├── app.api.routes
-    │   └── app.core.config
-    └── app.db.session
-        └── app.models.user [CYCLE DETECTED]
 ```
 
 #### Targeted Tree Views
@@ -472,7 +478,7 @@ qv tree --json
 
 ---
 
-### 5. Framework-Specific Analyzers (`qv framework`)
+### 6. Framework-Specific Analyzers (`qv framework`)
 
 Run dedicated analyzers tailored for popular frameworks.
 
@@ -481,56 +487,24 @@ Run dedicated analyzers tailored for popular frameworks.
 qv framework --name fastapi
 ```
 
-**Terminal Output:**
-```text
-qv (FastAPI Doctor)
-Project: my-api
-Python:  3.12.7
-
-1 Errors   1 Warnings   32 Checks Passed
-
-┌────────────────── [ERROR] FAP-001 Blocking call in async endpoint ───────────┐
-│ File 'src/api/users.py:42'                                                   │
-│ Synchronous blocking call 'time.sleep()' inside 'async def get_users()'      │
-│ blocks the asyncio event loop and starves concurrent requests.               │
-│                                                                              │
-│ Suggested fix:                                                               │
-│   Use 'await asyncio.sleep()' or run in threadpool via anyio.to_thread.      │
-└──────────────────────────────────────────────────────────────────────────────┘
-
-┌────────────────── [WARN] FAP-003 Missing response model ─────────────────────┐
-│ Route '@router.get("/items")' in src/api/items.py lacks a response_model.   │
-│                                                                              │
-│ Suggested fix:                                                               │
-│   Add return type annotation: 'async def get_items() -> list[ItemResponse]:' │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
 #### SQLAlchemy Analyzer (`SQL-001` - `SQL-030`)
 ```bash
 qv framework --name sqlalchemy
 ```
 
-**Terminal Output:**
-```text
-qv (SQLAlchemy Doctor)
-Project: my-api
+#### Django Analyzer (`DJG-001` - `DJG-006`)
+```bash
+qv framework --name django
+```
 
-1 Errors   0 Warnings   28 Checks Passed
-
-┌────────────────── [ERROR] SQL-004 SQL Injection Risk ─────────────────────────┐
-│ File 'src/db/repositories/user.py:28'                                        │
-│ Raw SQL f-string interpolation detected: text(f"SELECT * FROM users WHERE id={uid}")│
-│                                                                              │
-│ Suggested fix:                                                               │
-│   Use bound query parameters: text("SELECT * FROM users WHERE id = :uid")    │
-│   session.execute(stmt, {"uid": uid})                                        │
-└──────────────────────────────────────────────────────────────────────────────┘
+#### Celery Analyzer (`CEL-001` - `CEL-004`)
+```bash
+qv framework --name celery
 ```
 
 ---
 
-### 6. Subsystem-Focused Scans
+### 7. Subsystem-Focused Scans
 
 Run targeted audits on specific components:
 
@@ -543,16 +517,24 @@ qv environment
 
 # Check AST & imports only (circular import loops, unresolvable modules, orphan files)
 qv architecture
+
+# Check Dockerfiles & compose files (root users, unpinned tags, secrets, cache)
+qv docker
+
+# Check CI workflows (matrix drift, unpinned actions, quality gates, hardcoded secrets)
+qv ci
 ```
 
 ---
 
-### 7. Rule Explanation & Catalog Lookup (`qv explain`)
+### 8. Rule Explanation & Catalog Lookup (`qv explain`)
 
 Lookup rule definitions, remediation strategies, and documentation for any diagnostic code:
 
 ```bash
 qv explain FAP-001
+qv explain CI-001
+qv explain DOC-001
 ```
 
 **Terminal Output:**
