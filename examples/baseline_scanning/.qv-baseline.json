@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "project_name": "baseline-example-service",
+  "created_at": "2026-10-06T10:57:41.240442+00:00",
+  "total_diagnostics": 2,
+  "diagnostics": [
+    {
+      "id": "DEP-002",
+      "title": "Missing dependency: httpx",
+      "file": "main.py",
+      "line": 2,
+      "severity": "error",
+      "fingerprint": "b0162931c2d2ca0d"
+    },
+    {
+      "id": "DEP-003",
+      "title": "No direct import detected: requests",
+      "file": "C:\\Users\\inzam\\RND\\qv\\examples\\baseline_scanning\\pyproject.toml",
+      "line": null,
+      "severity": "warning",
+      "fingerprint": "cc0470803be15e45"
+    }
+  ]
+}

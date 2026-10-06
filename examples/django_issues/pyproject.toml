@@ -1,0 +1,6 @@
+[project]
+name = "django-example-service"
+version = "0.1.0"
+dependencies = [
+    "django>=4.2",
+]
