@@ -76,7 +76,67 @@ services.auth
 
 ---
 
-## 4. JSON Export for Tooling
+## 4. Dependency Risk Graph (`qv dependency --graph` / `qv tree --risk`)
+
+Take dependency trees further by analyzing **usage patterns, functional classifications, and diagnostic risk levels** across direct and transitive dependencies:
+
+```bash
+# Render annotated dependency risk graph
+qv dependency --graph
+
+# Or via tree with risk flag
+qv tree --risk
+```
+
+### 4.1 Node Annotations & Classification
+
+The Dependency Risk Graph classifies each package into its ecosystem role:
+- **Framework Core**: e.g., `fastapi`, `celery`, `django`, `sqlalchemy`, `flask`
+- **Runtime Driver / Infrastructure**: e.g., `amqp`, `kombu`, `asyncpg`, `psycopg2`, `redis`, `uvicorn`
+- **Application Library**: e.g., `requests`, `httpx`, `pydantic`, `rich`
+- **Dev & Tooling**: e.g., `pytest`, `ruff`, `mypy`, `black`
+
+Example Output:
+```text
+🛡️  Dependency Risk Graph: payment-service (3 direct, 48 total packages)
+└── Production Dependencies
+    └── celery v5.4.0 (>=5.3.0)  HEALTHY
+        ├── Type: Direct dependency
+        ├── Import: Directly imported (4 files)
+        ├── Role: Framework core
+        ├── Assessment: No diagnostic issues found; dependency is healthy
+        └── kombu v5.3.5  HEALTHY
+            └── amqp v5.2.0  INFORMATIONAL
+                ├── Type: Transitive dependency
+                ├── Import: No direct AST import found
+                ├── Role: Runtime driver / message broker
+                └── Assessment: Safe runtime dependency (DEP-003 informational)
+```
+
+### 4.2 Filtering by Risk Level
+
+Filter the dependency graph by risk threshold:
+```bash
+# Show only high and critical risk dependencies
+qv dependency --graph --risk high
+
+# Show only healthy packages
+qv dependency --graph --risk healthy
+```
+
+### 4.3 Compact Mode & JSON Export
+
+```bash
+# Render risk tree without detailed multi-line annotations
+qv dependency --graph --no-annotate
+
+# Export full risk graph metadata as JSON
+qv dependency --graph --json
+```
+
+---
+
+## 5. JSON Export for Tooling
 
 To emit the tree hierarchy, package statistics, and detected cycles as structured JSON for CI ingestion or custom dashboards:
 
