@@ -122,7 +122,7 @@ This reference details the internal architecture, lifecycle, and component inter
 1. **Layer & Component Discovery (`ArchitectureGraph`):**
    - Discovers components by mapping file paths into architectural folders (e.g. `api`, `services`, `repositories`, `database`, `utils`).
    - Slices subpackages only when the first path component is a recognized package root (`clean_parts[0] in known_roots`). For flat layouts, uses `clean_parts[0]`.
-   - Resolves target modules to components strictly by matching top-level segments (`mod_name.split(".")[0]`) or registered internal module paths to avoid converting third-party imports into internal edges.
+   - Resolves target modules to components using registered internal module paths or top-level segment matches; a top-level name collision can map a third-party import to an internal edge.
 2. **Cycle & Layer Violation Detection:**
    - Uses DFS on component adjacency graph to detect cycles (`ARC-002`, `Severity.ERROR`).
    - Checks layer directionality and skipping rules (e.g. `API` bypassing `Services`/`Repository` to directly import `Database`, or lower layers importing higher layers) (`ARC-001`, `Severity.WARNING`).
