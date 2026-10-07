@@ -52,7 +52,36 @@ jobs:
 
 ---
 
-### 2.2 Baseline & Differential Scanning (Prevent New Regressions)
+### 2.2 GitHub PR Intelligence (Changed Code & Annotations)
+
+Run PR intelligence on pull requests to analyze only modified lines/files, emit inline workflow command annotations (`::error` and `::warning`), report resolved issues, and generate a step summary:
+
+```yaml
+name: PR Intelligence
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  qv-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch git history for base ref comparison
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      # Analyzes changed code, emits GitHub annotations, and generates step summary
+      - name: Run QV PR Intelligence
+        run: uv run qv pr --ci --github-annotations
+```
+
+---
+
+### 2.3 Baseline & Differential Scanning (Prevent New Regressions)
 
 For large existing codebases with pre-existing warnings or technical debt, use baseline snapshots so CI only fails on **new** diagnostic issues introduced in pull requests:
 

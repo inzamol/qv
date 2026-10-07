@@ -362,10 +362,53 @@ qv framework --name fastapi
 # Scan specifically for Django issues
 qv framework --name django
 
-# Scan specifically for Celery issues
-qv framework --name celery
-
-# Scan specifically for SQLAlchemy / SQL database issues
-qv framework --name sqlalchemy
 ```
+
+---
+
+## 11. `qv pr` (alias: `qv pr-analysis`)
+
+GitHub Pull Request Intelligence engine that analyzes only the changed code in a PR, reporting newly introduced issues versus resolved issues, emitting inline GitHub Actions workflow annotations, and generating PR markdown summaries.
+
+```bash
+qv pr [PATH] [OPTIONS]
+```
+
+Example Output:
+```text
+QV Pull Request Analysis
+
+Changed files: 8
+Affected checks: 17
+
+New issues
+──────────
+FAP-021  users.py:42
+Async endpoint performs blocking I/O
+
+DEP-002  requirements.txt
+Missing declaration for httpx
+
+Resolved
+────────
+SQL-008
+```
+
+### 11.1 Options
+
+| Option | Description |
+|---|---|
+| `-b, --base <REF>` | Base git branch or ref (default: auto-detected from `GITHUB_BASE_REF` or git history) |
+| `--head <REF>` | Head git commit or ref (default: `HEAD`) |
+| `--strict` | Promotes warnings to errors (fails CI on warnings) |
+| `--ci` | Runs non-interactively with step summary & inline annotations |
+| `--github-annotations` | Emits GitHub Actions inline workflow command annotations (`::error` and `::warning`) |
+| `--comment` | Outputs formatted Markdown suitable for GitHub PR comments |
+| `--json` | Emits PR analysis results as structured JSON |
+| `--sarif` | Emits new PR findings in standard SARIF v2.1.0 format |
+| `--baseline <FILE>` | Compare against an established baseline snapshot file |
+| `--files <LIST>` | Comma-separated list of changed files (e.g. `users.py,requirements.txt`) |
+| `--diff <FILE>` | Path to a unified diff patch file |
+| `-o, --output <FILE>` | Writes report directly to a file |
+
 

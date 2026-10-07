@@ -22,6 +22,7 @@ from qv.core.baseline import filter_against_baseline, load_baseline_fingerprints
 from qv.core.config import ConfigurationError
 from qv.core.engine import AnalysisEngine
 from qv.core.models import ScanResult, Severity
+from qv.core.pr import PRAnalyzer
 from qv.core.project import load_project
 from qv.frameworks import AVAILABLE_FRAMEWORK_ANALYZERS
 from qv.remediation.engine import RemediationEngine
@@ -30,6 +31,7 @@ from qv.reporters.doctor_reporter import DoctorReporter
 from qv.reporters.github_annotator import GitHubAnnotator
 from qv.reporters.html_reporter import HtmlReporter
 from qv.reporters.json_reporter import JsonReporter
+from qv.reporters.pr_reporter import PRReporter
 from qv.reporters.sarif import SarifReporter
 from qv.reporters.terminal import TerminalReporter
 from qv.rules.registry import RULES_CATALOG, get_rule_definition
@@ -342,6 +344,19 @@ def doctor_cmd(
     default=None,
     help="Output format (json, sarif, html, terminal, text).",
 )
+@click.option(
+    "--pr",
+    "is_pr",
+    is_flag=True,
+    help="Run Pull Request differential analysis (analyzes changed code vs base branch).",
+)
+@click.option(
+    "--pr-base",
+    "pr_base",
+    type=str,
+    default=None,
+    help="Base git branch or ref for PR differential analysis.",
+)
 def scan(
     path: Path,
     strict: bool,
@@ -357,6 +372,8 @@ def scan(
     errors_only: bool = False,
     min_severity: str | None = None,
     output_format: str | None = None,
+    is_pr: bool = False,
+    pr_base: str | None = None,
 ) -> None:
     """Scan a Python project and report health findings."""
     if output_format:
@@ -365,6 +382,53 @@ def scan(
             as_json = True
         elif fmt == "sarif":
             as_sarif = True
+
+    if is_pr:
+        with _handle_cli_errors("PR analysis"):
+            analyzer = PRAnalyzer(project_root=path)
+            pr_result = analyzer.analyze(
+                base_ref=pr_base,
+                baseline_path=baseline_path,
+            )
+            reporter = PRReporter(console=console)
+
+            if github_annotations or ci_mode:
+                reporter.emit_annotations(pr_result)
+                reporter.write_step_summary(pr_result)
+
+            if as_sarif:
+                new_scan_result = ScanResult.create(
+                    project_name=pr_result.project_name,
+                    project_path=pr_result.project_path,
+                    python_version="3.12",
+                    package_manager="uv",
+                    diagnostics=pr_result.new_issues,
+                )
+                rendered = SarifReporter().render(new_scan_result)
+            elif as_json:
+                import json
+
+                rendered = json.dumps(pr_result.to_dict(), indent=2)
+            else:
+                rendered = None
+
+            _render_and_dispatch_output(
+                result=ScanResult.create(
+                    project_name=pr_result.project_name,
+                    project_path=pr_result.project_path,
+                    python_version="3.12",
+                    package_manager="uv",
+                    diagnostics=pr_result.new_issues,
+                ),
+                rendered=rendered,
+                default_renderer=lambda: reporter.render(pr_result),
+                print_handler=lambda: reporter.print_result(pr_result),
+                output=output,
+                success_message="PR report successfully written to",
+                strict=strict,
+                ci_mode=ci_mode,
+            )
+        return
 
     with _handle_cli_errors("Analysis"):
         result = _run_analysis_pipeline(
@@ -698,6 +762,219 @@ def baseline_verify_cmd(path: Path, baseline: Path, strict: bool) -> None:
         ):
             sys.exit(1)
         sys.exit(0)
+
+
+@cli.command("pr")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--base",
+    "-b",
+    "base_ref",
+    type=str,
+    default=None,
+    help="Base git branch or ref (default: auto-detect from GITHUB_BASE_REF or git history).",
+)
+@click.option(
+    "--head",
+    "head_ref",
+    type=str,
+    default="HEAD",
+    help="Head git commit or ref (default: HEAD).",
+)
+@click.option("--strict", is_flag=True, help="Promote warnings to errors (fails CI on warnings).")
+@click.option("--ci", "ci_mode", is_flag=True, help="Run in CI mode with non-interactive output.")
+@click.option(
+    "--github-annotations",
+    is_flag=True,
+    help="Emit GitHub Actions inline workflow command annotations for new issues.",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output PR analysis in JSON format.")
+@click.option(
+    "--sarif", "as_sarif", is_flag=True, help="Output new PR issues in SARIF v2.1.0 format."
+)
+@click.option(
+    "--comment",
+    is_flag=True,
+    help="Output formatted Markdown suitable for GitHub PR comments.",
+)
+@click.option(
+    "--output", "-o", type=click.Path(dir_okay=False, path_type=Path), help="Write output to file."
+)
+@click.option(
+    "--baseline",
+    "baseline_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Filter findings against existing baseline snapshot.",
+)
+@click.option(
+    "--files",
+    "files_list",
+    type=str,
+    default=None,
+    help="Comma-separated list of changed files (e.g. 'users.py,models.py').",
+)
+@click.option(
+    "--diff",
+    "diff_file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to unified diff patch file.",
+)
+def pr_cmd(
+    path: Path,
+    base_ref: str | None,
+    head_ref: str,
+    strict: bool,
+    ci_mode: bool,
+    github_annotations: bool,
+    as_json: bool,
+    as_sarif: bool,
+    comment: bool,
+    output: Path | None,
+    baseline_path: Path | None,
+    files_list: str | None,
+    diff_file: Path | None,
+) -> None:
+    """Analyze changed code in a Pull Request and report newly introduced vs resolved issues."""
+    with _handle_cli_errors("Pull Request analysis"):
+        changed_files = (
+            [f.strip() for f in files_list.split(",") if f.strip()] if files_list else None
+        )
+        diff_text = diff_file.read_text(encoding="utf-8") if diff_file else None
+
+        analyzer = PRAnalyzer(project_root=path)
+        pr_result = analyzer.analyze(
+            base_ref=base_ref,
+            head_ref=head_ref,
+            baseline_path=baseline_path,
+            changed_files_list=changed_files,
+            diff_text=diff_text,
+        )
+
+        reporter = PRReporter(console=console)
+
+        if ci_mode or github_annotations:
+            reporter.emit_annotations(pr_result)
+            reporter.write_step_summary(pr_result)
+
+        if as_sarif:
+            new_scan_result = ScanResult.create(
+                project_name=pr_result.project_name,
+                project_path=pr_result.project_path,
+                python_version="3.12",
+                package_manager="uv",
+                diagnostics=pr_result.new_issues,
+            )
+            sarif_text = SarifReporter().render(new_scan_result)
+            if output:
+                output.write_text(sarif_text, encoding="utf-8")
+                console.print(f"[green]SARIF report successfully written to {output}[/green]")
+            else:
+                click.echo(sarif_text)
+        elif as_json:
+            import json
+
+            json_text = json.dumps(pr_result.to_dict(), indent=2)
+            if output:
+                output.write_text(json_text, encoding="utf-8")
+                console.print(f"[green]JSON report successfully written to {output}[/green]")
+            else:
+                click.echo(json_text)
+        elif comment:
+            md_text = reporter.render_markdown(pr_result)
+            if output:
+                output.write_text(md_text, encoding="utf-8")
+                console.print(
+                    f"[green]PR comment markdown successfully written to {output}[/green]"
+                )
+            else:
+                click.echo(md_text)
+        else:
+            if output:
+                rendered_term = reporter.render(pr_result)
+                output.write_text(rendered_term, encoding="utf-8")
+                console.print(f"[green]PR report successfully written to {output}[/green]")
+            else:
+                reporter.print_result(pr_result)
+
+        if pr_result.has_blocking_errors or (
+            (strict or ci_mode) and pr_result.new_warnings_count > 0
+        ):
+            sys.exit(1)
+        sys.exit(0)
+
+
+@cli.command("pr-analysis")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option("--base", "-b", "base_ref", type=str, default=None, help="Base git branch or ref.")
+@click.option("--head", "head_ref", type=str, default="HEAD", help="Head git ref.")
+@click.option("--strict", is_flag=True, help="Promote warnings to errors.")
+@click.option("--ci", "ci_mode", is_flag=True, help="Run in CI mode.")
+@click.option("--github-annotations", is_flag=True, help="Emit GitHub workflow annotations.")
+@click.option("--json", "as_json", is_flag=True, help="Output JSON.")
+@click.option("--sarif", "as_sarif", is_flag=True, help="Output SARIF.")
+@click.option("--comment", is_flag=True, help="Output PR comment markdown.")
+@click.option(
+    "--output", "-o", type=click.Path(dir_okay=False, path_type=Path), help="Output file."
+)
+@click.option(
+    "--baseline",
+    "baseline_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Baseline file.",
+)
+@click.option("--files", "files_list", type=str, default=None, help="Changed files list.")
+@click.option(
+    "--diff",
+    "diff_file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Diff file.",
+)
+@click.pass_context
+def pr_analysis_alias(
+    ctx: click.Context,
+    path: Path,
+    base_ref: str | None,
+    head_ref: str,
+    strict: bool,
+    ci_mode: bool,
+    github_annotations: bool,
+    as_json: bool,
+    as_sarif: bool,
+    comment: bool,
+    output: Path | None,
+    baseline_path: Path | None,
+    files_list: str | None,
+    diff_file: Path | None,
+) -> None:
+    """Alias for 'qv pr' command."""
+    ctx.invoke(
+        pr_cmd,
+        path=path,
+        base_ref=base_ref,
+        head_ref=head_ref,
+        strict=strict,
+        ci_mode=ci_mode,
+        github_annotations=github_annotations,
+        as_json=as_json,
+        as_sarif=as_sarif,
+        comment=comment,
+        output=output,
+        baseline_path=baseline_path,
+        files_list=files_list,
+        diff_file=diff_file,
+    )
 
 
 @cli.command("fix")
