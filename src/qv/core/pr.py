@@ -131,9 +131,11 @@ PROJECT_CONFIG_FILES = {
 def _normalize_path(path_str: str) -> str:
     """Normalize file path to POSIX format without leading './' or leading '/'."""
     norm = path_str.replace("\\", "/").strip()
-    if norm.startswith("./"):
+    while norm.startswith("./"):
         norm = norm[2:]
-    return norm.lstrip("/")
+    while norm.startswith("/"):
+        norm = norm[1:]
+    return norm
 
 
 class PRAnalyzer:
