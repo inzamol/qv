@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from qv.analyzers.ci.analyzer import CIAnalyzer
 from qv.analyzers.dependencies.analyzer import DependencyAnalyzer
@@ -56,7 +56,11 @@ class AnalysisEngine:
                 SqlAlchemyAnalyzer(),
             ]
 
-    def run(self, context: ProjectContext) -> ScanResult:
+    def run(
+        self,
+        context: ProjectContext,
+        on_progress: Callable[[str], None] | None = None,
+    ) -> ScanResult:
         """Run all registered analyzers against the given ProjectContext."""
         raw_diagnostics: list[Diagnostic] = list(getattr(context, "discovery_diagnostics", ()))
         analyzer_results: list[AnalyzerExecutionResult] = []
@@ -65,6 +69,8 @@ class AnalysisEngine:
         for analyzer in self.analyzers:
             checks_evaluated += 1
             analyzer_name = getattr(analyzer, "name", analyzer.__class__.__name__)
+            if on_progress is not None:
+                on_progress(analyzer_name)
             try:
                 findings = analyzer.analyze(context)
                 status = getattr(analyzer, "status", AnalyzerStatus.OK)

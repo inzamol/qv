@@ -7,8 +7,10 @@ from qv.reporters.doctor_reporter import (
     DoctorReport,
     DoctorReporter,
 )
+from qv.reporters.github_annotator import GitHubAnnotator
 from qv.reporters.html_reporter import HtmlReporter
 from qv.reporters.json_reporter import JsonReporter
+from qv.reporters.pr_reporter import PRReporter
 from qv.reporters.sarif import SarifReporter
 from qv.reporters.terminal import TerminalReporter
 
@@ -22,4 +24,6 @@ __all__ = [
     "JsonReporter",
     "SarifReporter",
     "HtmlReporter",
+    "GitHubAnnotator",
+    "PRReporter",
 ]

@@ -10,4 +10,4 @@ except Exception:
     try:
         __version__ = importlib.metadata.version("qv")
     except Exception:
-        __version__ = "0.1.6"
+        __version__ = "0.1.7"
