@@ -154,8 +154,6 @@ class PRAnalyzer:
             for candidate in [f"origin/{gh_base}", gh_base]:
                 if self._git_ref_exists(candidate):
                     return candidate
-            if self._is_git_repo():
-                return gh_base
             return None
 
         # 2. Check common git branches
