@@ -118,6 +118,7 @@ exclude = [
     "**/__pycache__",
     "examples",
     ".venv",
+    ".github",
 ]
 
 [tool.qv.paths]
