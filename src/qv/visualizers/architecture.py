@@ -268,11 +268,6 @@ class ArchitectureGraph:
         for m, comp in self._module_to_component.items():
             if mod_name == m or mod_name.startswith(f"{m}."):
                 return comp
-
-        top = mod_name.lower().split(".")[0]
-        if top in self.components:
-            return top
-
         return None
 
     def _build_dependency_edges(self) -> None:
