@@ -761,11 +761,12 @@ def architecture_scan_cmd(path: Path, strict: bool, as_json: bool, as_sarif: boo
 
         all_diagnostics = list(result.diagnostics) + filtered_arch_diagnostics
 
-        extra_passed = 0
-        if not any(d.id == "ARC-001" for d in filtered_arch_diagnostics):
-            extra_passed += 1
-        if not any(d.id == "ARC-002" for d in filtered_arch_diagnostics):
-            extra_passed += 1
+        raw_arc_ids = {d.id for d in arch_diagnostics}
+        extra_passed = sum(
+            1
+            for rid in ("ARC-001", "ARC-002")
+            if project.config.is_rule_enabled(rid) and rid not in raw_arc_ids
+        )
 
         scan_result = ScanResult.create(
             project_name=result.project_name,
