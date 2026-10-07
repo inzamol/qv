@@ -88,6 +88,16 @@
 - **Description:** A standard library module imported in source code was deprecated or completely removed in modern Python (PEP 594).
 - **Remediation:** Replace the removed stdlib module with its modern replacement (e.g. importlib instead of imp, subprocess instead of pipes).
 
+### 4.5 ARC-001: Architecture Layer Violation
+- **Default Severity:** `WARNING`
+- **Description:** A module in an upper architectural layer directly imports a lower layer bypassing intermediate abstraction layers (e.g. API importing Database directly instead of through Services/Repositories), or a lower layer imports an upper layer.
+- **Remediation:** Route access through the designated intermediate service/repository layer or invert the dependency using interfaces/events.
+
+### 4.6 ARC-002: Architectural Circular Component Dependency
+- **Default Severity:** `ERROR`
+- **Description:** A circular dependency cycle exists between high-level architectural components or layers (e.g. Services → Utils → Services).
+- **Remediation:** Decouple the architectural components by extracting shared utilities, introducing an abstraction layer, or using dependency injection.
+
 ---
 
 ## 5. Packaging Rules (`PKG-xxx`)

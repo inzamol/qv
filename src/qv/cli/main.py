@@ -21,7 +21,7 @@ from qv.analyzers.imports.analyzer import ImportAnalyzer
 from qv.core.baseline import filter_against_baseline, load_baseline_fingerprints, save_baseline
 from qv.core.config import ConfigurationError
 from qv.core.engine import AnalysisEngine
-from qv.core.models import ScanResult, Severity
+from qv.core.models import Diagnostic, ScanResult, Severity
 from qv.core.pr import PRAnalyzer
 from qv.core.project import load_project
 from qv.frameworks import AVAILABLE_FRAMEWORK_ANALYZERS
@@ -36,6 +36,7 @@ from qv.reporters.sarif import SarifReporter
 from qv.reporters.terminal import TerminalReporter
 from qv.rules.registry import RULES_CATALOG, get_rule_definition
 from qv.tui.app import TuiExplorer
+from qv.visualizers.architecture import ArchitectureGraph, ArchitectureVisualizer
 from qv.visualizers.risk_graph import DependencyRiskGraph
 from qv.visualizers.tree import TreeVisualizer
 
@@ -690,20 +691,194 @@ def environment_cmd(path: Path) -> None:
         sys.exit(1 if result.has_blocking_errors else 0)
 
 
-@cli.command("architecture")
+class ArchitectureGroup(click.Group):
+    """Custom Click Group for 'qv architecture' supporting both standalone scan and 'graph' subcommand."""
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if not args:
+            args = ["scan"]
+        elif args[0] in ("--help", "-h"):
+            pass
+        elif args[0] == "graph":
+            pass
+        elif args[0] == "scan":
+            pass
+        elif "--graph" in args or "-g" in args:
+            filtered = [a for a in args if a not in ("--graph", "-g")]
+            args = ["graph"] + filtered
+        elif not args[0].startswith("-"):
+            target_path = args[0]
+            rest = args[1:]
+            if "--graph" in rest or "-g" in rest:
+                rest = [a for a in rest if a not in ("--graph", "-g")]
+                args = ["graph", target_path] + rest
+            else:
+                args = ["scan", target_path] + rest
+        else:
+            args = ["scan"] + args
+        return super().parse_args(ctx, args)
+
+
+@cli.group("architecture", cls=ArchitectureGroup, invoke_without_command=True)
+def architecture_group() -> None:
+    """Run AST/import architecture diagnostics or render layer architecture graph."""
+    pass
+
+
+@architecture_group.command("scan")
 @click.argument(
     "path",
     default=".",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def architecture_cmd(path: Path) -> None:
+@click.option("--strict", is_flag=True, help="Promote warnings to errors.")
+@click.option("--json", "as_json", is_flag=True, help="Output diagnostics in JSON format.")
+@click.option("--sarif", "as_sarif", is_flag=True, help="Output diagnostics in SARIF format.")
+def architecture_scan_cmd(path: Path, strict: bool, as_json: bool, as_sarif: bool) -> None:
     """Run AST and import architecture checks only."""
     with _handle_cli_errors("Architecture analysis"):
         project = load_project(path)
         engine = AnalysisEngine(config=project.config, analyzers=[ImportAnalyzer()])
         result = engine.run(project.context)
-        TerminalReporter(console=console).print_result(result)
-        sys.exit(1 if result.has_blocking_errors else 0)
+
+        graph = ArchitectureGraph(context=project.context, diagnostics=result.diagnostics)
+        arch_diagnostics = graph.to_diagnostics()
+
+        filtered_arch_diagnostics: list[Diagnostic] = []
+        for diag in arch_diagnostics:
+            if not project.config.is_rule_enabled(diag.id):
+                continue
+            effective_sev = project.config.get_effective_severity(diag.id, diag.severity)
+            if project.config.hide_warnings and effective_sev == Severity.WARNING:
+                continue
+            if project.config.errors_only and effective_sev != Severity.ERROR:
+                continue
+            if project.config.min_severity:
+                sev_order = {Severity.ERROR: 3, Severity.WARNING: 2, Severity.INFO: 1}
+                if sev_order.get(effective_sev, 0) < sev_order.get(project.config.min_severity, 0):
+                    continue
+            filtered_arch_diagnostics.append(diag.model_copy(update={"severity": effective_sev}))
+
+        all_diagnostics = list(result.diagnostics) + filtered_arch_diagnostics
+
+        raw_arc_ids = {d.id for d in arch_diagnostics}
+        extra_passed = sum(
+            1
+            for rid in ("ARC-001", "ARC-002")
+            if project.config.is_rule_enabled(rid) and rid not in raw_arc_ids
+        )
+
+        scan_result = ScanResult.create(
+            project_name=result.project_name,
+            project_path=result.project_path,
+            python_version=result.python_version,
+            package_manager=result.package_manager,
+            diagnostics=all_diagnostics,
+            checks_passed=result.summary.checks_passed + extra_passed,
+            root_causes=result.root_causes,
+            analyzer_results=result.analyzer_results,
+            metadata=result.metadata,
+        )
+
+        if as_json:
+            click.echo(JsonReporter().render(scan_result))
+        elif as_sarif:
+            click.echo(SarifReporter().render(scan_result))
+        else:
+            TerminalReporter(console=console).print_result(scan_result)
+        sys.exit(
+            1
+            if scan_result.has_blocking_errors
+            or (strict and scan_result.summary.warnings_count > 0)
+            else 0
+        )
+
+
+@architecture_group.command("graph")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["terminal", "ascii", "mermaid", "dot", "json"], case_sensitive=False),
+    default="terminal",
+    help="Output format (terminal, ascii, mermaid, dot, json).",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output architecture map as structured JSON.",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write output to file.",
+)
+@click.option(
+    "--strict",
+    is_flag=True,
+    help="Exit with code 1 if any layer violations or cycles are detected.",
+)
+def architecture_graph_cmd(
+    path: Path,
+    output_format: str,
+    as_json: bool,
+    output: Path | None,
+    strict: bool,
+) -> None:
+    """Visualize architectural layer map, dependency flow, cycles, and layer violations."""
+    with _handle_cli_errors("Architecture graph"):
+        project = load_project(path)
+        engine = AnalysisEngine(config=project.config, analyzers=[ImportAnalyzer()])
+        result = engine.run(project.context)
+
+        graph = ArchitectureGraph(context=project.context, diagnostics=result.diagnostics)
+        visualizer = ArchitectureVisualizer(graph=graph, console=console)
+
+        fmt = output_format.lower()
+        if as_json or fmt == "json":
+            import json
+
+            content = json.dumps(graph.to_dict(), indent=2)
+            if output:
+                output.write_text(content, encoding="utf-8")
+                console.print(f"[green]Architecture graph JSON written to {output}[/green]")
+            else:
+                click.echo(content)
+        elif fmt == "mermaid":
+            content = graph.to_mermaid()
+            if output:
+                output.write_text(content, encoding="utf-8")
+                console.print(f"[green]Architecture Mermaid diagram written to {output}[/green]")
+            else:
+                click.echo(content)
+        elif fmt == "dot":
+            content = graph.to_dot()
+            if output:
+                output.write_text(content, encoding="utf-8")
+                console.print(f"[green]Architecture DOT graph written to {output}[/green]")
+            else:
+                click.echo(content)
+        elif fmt == "ascii":
+            content = visualizer.render_ascii_flow()
+            if output:
+                output.write_text(content, encoding="utf-8")
+                console.print(f"[green]Architecture ASCII map written to {output}[/green]")
+            else:
+                click.echo(content)
+        else:
+            visualizer.print_graph()
+
+        if strict and graph.violations:
+            sys.exit(1)
+        sys.exit(0)
 
 
 @cli.command("docker")

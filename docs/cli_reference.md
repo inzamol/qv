@@ -319,10 +319,38 @@ qv environment [PATH]
 ```
 
 ### 10.3 `qv architecture`
-Scans source code for circular imports and unresolved internal modules.
+Scans source code for circular imports, unresolved internal modules, architectural layer violations (`ARC-001`), and circular component cycles (`ARC-002`), or visualizes the project's Architectural Layer Map.
 
 ```bash
-qv architecture [PATH]
+qv architecture [PATH] [OPTIONS]
+qv architecture graph [PATH] [OPTIONS]
+```
+
+Options:
+- `-g, --graph`: Render visual architecture layer map and dependency flow.
+- `-f, --format [terminal|ascii|mermaid|dot|json]`: Output format for the architecture graph (default: `terminal`).
+- `--json`: Output architecture map as structured JSON.
+- `--strict`: Fail with exit code `1` if any architectural layer violations or circular component dependencies are detected.
+- `-o, --output <FILE>`: Save generated architecture map or diagram directly to disk.
+
+Example:
+```bash
+# Run architecture static diagnostic scan
+qv architecture
+
+# Visualize architectural layer map & flow in rich terminal
+qv architecture graph
+# or shorthand
+qv architecture --graph
+
+# Export architecture map as GitHub-flavored Mermaid diagram
+qv architecture graph --format mermaid -o architecture.md
+
+# Export architecture graph as structured JSON
+qv architecture graph --json
+
+# Fail CI if layer violations or component cycles exist
+qv architecture graph --strict
 ```
 
 ### 10.4 `qv docker`
