@@ -224,7 +224,7 @@ Run `qv inspect` (or `qv ui`) for a full terminal dashboard:
 |---|---|---|---|
 | **Dependencies** | `DEP-001` - `DEP-006` | Constraint conflicts, undeclared imports, unused dependencies, Python version mismatches, security vulnerabilities | `ERROR` / `WARNING` |
 | **Environment** | `ENV-001` - `ENV-003` | Active interpreter drift, Dockerfile base image mismatches, CI matrix drift | `WARNING` |
-| **Architecture** | `IMP-001` - `IMP-004` | Circular import cycles, unresolved local imports, orphan modules, deprecated stdlib modules | `ERROR` / `WARNING` |
+| **Architecture** | `IMP-001` - `IMP-004`<br/>`ARC-001` - `ARC-002` | Circular imports, layer violations, component cycles, orphan modules, stdlib deprecations | `ERROR` / `WARNING` |
 | **Packaging** | `PKG-001` - `PKG-002` | Missing PEP 621 metadata, invalid configuration syntax | `ERROR` / `WARNING` |
 | **FastAPI Doctor** | `FAP-001` - `FAP-038` | Blocking I/O in async routes, missing response models, insecure CORS, untyped request bodies, Pydantic v2 migrations | `ERROR` / `WARNING` |
 | **SQLAlchemy Doctor** | `SQL-001` - `SQL-030` | N+1 queries in loops, unclosed sessions, SQL injection risks, sync DB calls in async event loop, 2.0 mapped columns | `ERROR` / `WARNING` |
@@ -515,8 +515,14 @@ qv dependency
 # Check environment drift only (Python interpreter, Docker base images, CI matrix)
 qv environment
 
-# Check AST & imports only (circular import loops, unresolvable modules, orphan files)
+# Check AST, imports, layer violations, and component cycles
 qv architecture
+
+# Visualize architectural layer map, dependency flow, cycles, and layer violations
+qv architecture graph
+
+# Export architecture map as GitHub-compatible Mermaid flowchart
+qv architecture graph --format mermaid -o architecture.md
 
 # Check Dockerfiles & compose files (root users, unpinned tags, secrets, cache)
 qv docker

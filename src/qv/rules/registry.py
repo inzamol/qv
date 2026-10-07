@@ -287,6 +287,24 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         remediation_hint="Replace the removed stdlib module with its modern replacement (e.g. importlib instead of imp, subprocess instead of pipes).",
         doc_url=make_doc_url("44-imp-004-deprecated-or-removed-standard-library-module"),
     ),
+    "ARC-001": RuleDefinition(
+        id="ARC-001",
+        category="architecture",
+        title="Architecture layer violation",
+        description="A module in an upper architectural layer directly imports a lower layer bypassing intermediate abstraction layers, or a lower layer imports an upper layer.",
+        default_severity=Severity.WARNING,
+        remediation_hint="Route access through intermediate service/repository layers or invert the dependency using interfaces.",
+        doc_url=make_doc_url("45-arc-001-architecture-layer-violation"),
+    ),
+    "ARC-002": RuleDefinition(
+        id="ARC-002",
+        category="architecture",
+        title="Architectural circular component dependency",
+        description="A circular dependency cycle exists between high-level architectural components or layers.",
+        default_severity=Severity.ERROR,
+        remediation_hint="Decouple the architectural components by extracting shared utilities or introducing abstraction layers.",
+        doc_url=make_doc_url("46-arc-002-architectural-circular-component-dependency"),
+    ),
     # Packaging rules
     "PKG-001": RuleDefinition(
         id="PKG-001",

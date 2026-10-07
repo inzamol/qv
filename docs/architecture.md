@@ -100,9 +100,11 @@ All diagnostic checks are implemented as independent analyzers under `src/qv/ana
 - **CI Matrix Drift**: Verifies that GitHub Actions matrix definitions cover the Python versions declared in project manifests.
 
 ### 3.3 Imports & AST Analyzer (`src/qv/analyzers/imports/`)
-- **Circular Import Cycle Detection**: Constructs a directed module dependency graph and uses **Tarjan's Strongly Connected Components (SCC)** algorithm to identify recursive import loops.
-- **Unresolved Local Imports**: Flags imports that reference non-existent local packages or missing `__init__.py` files.
-- **Orphan / Dead File Detection**: Identifies Python modules that are never imported by any other module, test file, or console script entry point.
+- **Circular Import Cycle Detection (`IMP-001`)**: Constructs a directed module dependency graph and uses **Tarjan's Strongly Connected Components (SCC)** algorithm to identify recursive import loops.
+- **Unresolved Local Imports (`IMP-002`)**: Flags imports that reference non-existent local packages or missing `__init__.py` files.
+- **Orphan / Dead File Detection (`IMP-003`)**: Identifies Python modules that are never imported by any other module, test file, or console script entry point.
+- **Architecture Layer Violation Detection (`ARC-001`)**: Identifies downward layer skipping (e.g., API directly importing Database bypassing intermediate Services) and upward inverted dependencies.
+- **Circular Component Cycles (`ARC-002`)**: Traces cyclic dependencies between high-level architectural layers (e.g. Services → Utils → Services).
 
 ### 3.4 Packaging Analyzer (`src/qv/analyzers/packaging/`)
 - **PEP 621 Schema Validation**: Ensures required tables (`[project]`, `name`, `version`) are present and syntactically valid.
@@ -205,7 +207,9 @@ src/qv/
 │   ├── json.py                # JSON exporter
 │   └── github.py              # GitHub Actions PR annotation emitter
 ├── tui/
-│   └── dashboard.py           # Interactive Rich terminal explorer
+│   └── app.py                 # Interactive Rich terminal explorer
 └── visualizers/
+    ├── architecture.py        # Architectural layer map, ASCII flow, and Mermaid exporter
+    ├── risk_graph.py          # Dependency risk & blast radius graph
     └── tree.py                # Dependency & circular import visualizer
 ```
