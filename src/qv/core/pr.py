@@ -71,6 +71,8 @@ class PRAnalysisResult:
     total_issues_base: int = 0
     base_ref: str | None = None
     head_ref: str | None = None
+    python_version: str = "3.12"
+    package_manager: str = "uv"
 
     @property
     def new_errors_count(self) -> int:
@@ -92,6 +94,8 @@ class PRAnalysisResult:
         return {
             "project_name": self.project_name,
             "project_path": self.project_path,
+            "python_version": self.python_version,
+            "package_manager": self.package_manager,
             "base_ref": self.base_ref,
             "head_ref": self.head_ref,
             "changed_files_count": self.changed_files_count,
@@ -164,8 +168,24 @@ class PRAnalyzer:
 
         return None
 
+    def _is_git_repo(self) -> bool:
+        """Check if project_root is within a git repository."""
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "--is-inside-work-tree"],
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return res.returncode == 0 and res.stdout.strip() == "true"
+        except Exception:
+            return False
+
     def _git_ref_exists(self, ref: str) -> bool:
         """Check if a git ref exists in current repo."""
+        if not self._is_git_repo():
+            return False
         try:
             res = subprocess.run(
                 ["git", "rev-parse", "--verify", ref],
@@ -368,13 +388,14 @@ class PRAnalyzer:
                 if norm_cf not in file_diffs:
                     file_diffs[norm_cf] = FileDiffInfo(path=norm_cf, status="A")
 
-        changed_files_keys = list(file_diffs.keys())
         # If no changed files detected (e.g. no git history or diff), default to all files touched by head diagnostics
-        if not changed_files_keys and not base_ref and not baseline_path:
-            # Treat all head diagnostics files as changed
-            changed_files_keys = list(
-                {_normalize_path(d.file) for d in head_result.diagnostics if d.file}
-            )
+        if not file_diffs and not base_ref and not baseline_path:
+            for d in head_result.diagnostics:
+                if d.file:
+                    norm_f = _normalize_path(d.file)
+                    file_diffs[norm_f] = FileDiffInfo(path=norm_f, status="A")
+
+        changed_files_keys = list(file_diffs.keys())
 
         # 3. Obtain base diagnostics (from git base ref scan or baseline snapshot)
         base_scan_result: ScanResult | None = None
@@ -493,4 +514,6 @@ class PRAnalyzer:
             total_issues_base=total_base_count,
             base_ref=base_ref,
             head_ref=head_ref,
+            python_version=head_result.python_version,
+            package_manager=head_result.package_manager,
         )

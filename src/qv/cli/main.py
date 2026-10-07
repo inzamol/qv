@@ -397,23 +397,58 @@ def scan(
 
     if is_pr:
         with _handle_cli_errors("PR analysis"):
+            project = load_project(path)
+            config = project.config
+            if strict or ci_mode:
+                config.strict = True
+            if offline:
+                config.offline = True
+            if hide_warnings:
+                config.hide_warnings = True
+            if errors_only:
+                config.errors_only = True
+            if min_severity:
+                config.min_severity = Severity(min_severity.lower())
+
             analyzer = PRAnalyzer(project_root=path)
-            pr_result = analyzer.analyze(
-                base_ref=pr_base,
-                baseline_path=baseline_path,
-            )
+            show_progress = not as_json and not as_sarif and output is None
+            if show_progress and not ci_mode and console.is_terminal:
+                with console.status(
+                    "[bold cyan]Scanning PR changes...[/bold cyan]", spinner="dots"
+                ) as status:
+
+                    def update_status(name: str) -> None:
+                        """Update spinner status label with currently executing analyzer name."""
+                        status.update(
+                            f"[bold cyan]Running [bold white]{name}[/bold white]...[/bold cyan]"
+                        )
+
+                    pr_result = analyzer.analyze(
+                        base_ref=pr_base,
+                        baseline_path=baseline_path,
+                        config=config,
+                        on_progress=update_status,
+                    )
+            else:
+                pr_result = analyzer.analyze(
+                    base_ref=pr_base,
+                    baseline_path=baseline_path,
+                    config=config,
+                )
+
             reporter = PRReporter(console=console)
 
             if github_annotations or ci_mode:
-                reporter.emit_annotations(pr_result)
+                if github_annotations:
+                    reporter.emit_annotations(pr_result)
                 reporter.write_step_summary(pr_result)
 
             if as_sarif:
                 new_scan_result = ScanResult.create(
                     project_name=pr_result.project_name,
                     project_path=pr_result.project_path,
-                    python_version="3.12",
-                    package_manager="uv",
+                    python_version=pr_result.python_version,
+                    package_manager=pr_result.package_manager,
                     diagnostics=pr_result.new_issues,
                 )
                 rendered = SarifReporter().render(new_scan_result)
@@ -428,8 +463,8 @@ def scan(
                 result=ScanResult.create(
                     project_name=pr_result.project_name,
                     project_path=pr_result.project_path,
-                    python_version="3.12",
-                    package_manager="uv",
+                    python_version=pr_result.python_version,
+                    package_manager=pr_result.package_manager,
                     diagnostics=pr_result.new_issues,
                 ),
                 rendered=rendered,
@@ -861,6 +896,11 @@ def pr_cmd(
         )
         diff_text = diff_file.read_text(encoding="utf-8") if diff_file else None
 
+        project = load_project(path)
+        config = project.config
+        if strict or ci_mode:
+            config.strict = True
+
         analyzer = PRAnalyzer(project_root=path)
         if (
             not ci_mode
@@ -886,6 +926,7 @@ def pr_cmd(
                     baseline_path=baseline_path,
                     changed_files_list=changed_files,
                     diff_text=diff_text,
+                    config=config,
                     on_progress=update_status,
                 )
         else:
@@ -895,20 +936,22 @@ def pr_cmd(
                 baseline_path=baseline_path,
                 changed_files_list=changed_files,
                 diff_text=diff_text,
+                config=config,
             )
 
         reporter = PRReporter(console=console)
 
         if ci_mode or github_annotations:
-            reporter.emit_annotations(pr_result)
+            if github_annotations:
+                reporter.emit_annotations(pr_result)
             reporter.write_step_summary(pr_result)
 
         if as_sarif:
             new_scan_result = ScanResult.create(
                 project_name=pr_result.project_name,
                 project_path=pr_result.project_path,
-                python_version="3.12",
-                package_manager="uv",
+                python_version=pr_result.python_version,
+                package_manager=pr_result.package_manager,
                 diagnostics=pr_result.new_issues,
             )
             sarif_text = SarifReporter().render(new_scan_result)
