@@ -81,6 +81,7 @@ def _run_analysis_pipeline(
     html_output: Path | None = None,
     github_annotations: bool = False,
     baseline_path: Path | None = None,
+    show_progress: bool = True,
 ) -> ScanResult:
     """Load project context, apply configuration flags, execute engine, and emit annotations/HTML."""
     project = load_project(path)
@@ -97,7 +98,15 @@ def _run_analysis_pipeline(
         config.min_severity = Severity(min_severity.lower())
 
     engine = AnalysisEngine(config=config)
-    result = engine.run(project.context)
+    if show_progress and not ci_mode and console.is_terminal:
+        with console.status("[bold cyan]Scanning project...[/bold cyan]", spinner="dots") as status:
+
+            def update_status(name: str) -> None:
+                status.update(f"[bold cyan]Running [bold white]{name}[/bold white]...[/bold cyan]")
+
+            result = engine.run(project.context, on_progress=update_status)
+    else:
+        result = engine.run(project.context)
 
     if baseline_path and baseline_path.exists() and baseline_path.is_file():
         fps = load_baseline_fingerprints(baseline_path)
@@ -249,6 +258,7 @@ def doctor_cmd(
             as_sarif = True
 
     with _handle_cli_errors("Doctor analysis"):
+        show_progress = not as_json and not as_sarif and output is None
         result = _run_analysis_pipeline(
             path=path,
             strict=strict,
@@ -257,6 +267,7 @@ def doctor_cmd(
             html_output=html_output,
             github_annotations=github_annotations,
             baseline_path=baseline_path,
+            show_progress=show_progress,
         )
 
         doctor_reporter = DoctorReporter(console=console, top_n=top_n)
@@ -431,6 +442,7 @@ def scan(
         return
 
     with _handle_cli_errors("Analysis"):
+        show_progress = not as_json and not as_sarif and output is None
         result = _run_analysis_pipeline(
             path=path,
             strict=strict,
@@ -442,6 +454,7 @@ def scan(
             html_output=html_output,
             github_annotations=github_annotations,
             baseline_path=baseline_path,
+            show_progress=show_progress,
         )
 
         rendered = (
@@ -848,13 +861,39 @@ def pr_cmd(
         diff_text = diff_file.read_text(encoding="utf-8") if diff_file else None
 
         analyzer = PRAnalyzer(project_root=path)
-        pr_result = analyzer.analyze(
-            base_ref=base_ref,
-            head_ref=head_ref,
-            baseline_path=baseline_path,
-            changed_files_list=changed_files,
-            diff_text=diff_text,
-        )
+        if (
+            not ci_mode
+            and not as_json
+            and not as_sarif
+            and not comment
+            and output is None
+            and console.is_terminal
+        ):
+            with console.status(
+                "[bold cyan]Analyzing Pull Request changes...[/bold cyan]", spinner="dots"
+            ) as status:
+
+                def update_status(name: str) -> None:
+                    status.update(
+                        f"[bold cyan]Running [bold white]{name}[/bold white]...[/bold cyan]"
+                    )
+
+                pr_result = analyzer.analyze(
+                    base_ref=base_ref,
+                    head_ref=head_ref,
+                    baseline_path=baseline_path,
+                    changed_files_list=changed_files,
+                    diff_text=diff_text,
+                    on_progress=update_status,
+                )
+        else:
+            pr_result = analyzer.analyze(
+                base_ref=base_ref,
+                head_ref=head_ref,
+                baseline_path=baseline_path,
+                changed_files_list=changed_files,
+                diff_text=diff_text,
+            )
 
         reporter = PRReporter(console=console)
 

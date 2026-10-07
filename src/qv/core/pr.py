@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -325,13 +326,14 @@ class PRAnalyzer:
         changed_files_list: list[str] | None = None,
         diff_text: str | None = None,
         config: QvConfig | None = None,
+        on_progress: Callable[[str], None] | None = None,
     ) -> PRAnalysisResult:
         """Run Pull Request intelligence analysis."""
         # 1. Load current project and run analysis
         project = load_project(self.project_root)
         active_config = config or project.config
         engine = AnalysisEngine(config=active_config)
-        head_result = engine.run(project.context)
+        head_result = engine.run(project.context, on_progress=on_progress)
 
         # 2. Determine changed files and line diffs
         file_diffs: dict[str, FileDiffInfo] = {}
