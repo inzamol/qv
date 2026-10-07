@@ -26,7 +26,7 @@ class FileDiffInfo:
 
     path: str  # Normalized relative POSIX path (e.g. "src/qv/main.py")
     status: str = "M"  # 'A' (added), 'M' (modified), 'D' (deleted), 'R' (renamed)
-    added_lines: set[int] = field(default_factory=set)  # 1-indexed line numbers
+    added_lines: set[int] | None = None  # None = unavailable line info, set() = known added lines
     deleted_lines: set[int] = field(default_factory=set)
 
 
@@ -216,7 +216,7 @@ class PRAnalyzer:
                 if len(parts) >= 4:
                     raw_b_path = parts[3].removeprefix("b/")
                     current_file = _normalize_path(raw_b_path)
-                    current_info = FileDiffInfo(path=current_file, status="M")
+                    current_info = FileDiffInfo(path=current_file, status="M", added_lines=set())
                     file_diffs[current_file] = current_info
             elif line.startswith("new file mode ") and current_info:
                 current_info.status = "A"
@@ -234,13 +234,19 @@ class PRAnalyzer:
                 if target_raw != "/dev/null":
                     current_file = _normalize_path(target_raw)
                     if current_file not in file_diffs:
-                        current_info = FileDiffInfo(path=current_file, status="M")
+                        current_info = FileDiffInfo(
+                            path=current_file, status="M", added_lines=set()
+                        )
                         file_diffs[current_file] = current_info
                     else:
                         current_info = file_diffs[current_file]
+                        if current_info.added_lines is None:
+                            current_info.added_lines = set()
             elif line.startswith("@@ ") and current_info:
                 match = hunk_header_re.match(line)
                 if match:
+                    if current_info.added_lines is None:
+                        current_info.added_lines = set()
                     new_start = int(match.group(3))
                     new_count = int(match.group(4)) if match.group(4) is not None else 1
                     if new_count > 0:
@@ -489,12 +495,14 @@ class PRAnalyzer:
                         or cf.endswith("/" + norm_file)
                     ):
                         # File is changed!
-                        if info.status == "A" or not info.added_lines:
+                        if (
+                            info.status == "A"
+                            or info.added_lines is None
+                            or diag.line is None
+                            or Path(norm_file).name in PROJECT_CONFIG_FILES
+                        ):
                             is_changed = True
-                        elif diag.line is None or diag.line in info.added_lines:
-                            is_changed = True
-                        elif Path(norm_file).name in PROJECT_CONFIG_FILES:
-                            # Project config files (requirements.txt, etc.) affect whole project
+                        elif diag.line in info.added_lines:
                             is_changed = True
                         break
 

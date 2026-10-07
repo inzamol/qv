@@ -85,14 +85,18 @@ deleted file mode 100644
     diff_map = PRAnalyzer.parse_unified_diff(diff_text)
     assert "src/users.py" in diff_map
     assert diff_map["src/users.py"].status == "M"
-    assert 40 in diff_map["src/users.py"].added_lines
-    assert 41 in diff_map["src/users.py"].added_lines
-    assert 44 in diff_map["src/users.py"].added_lines
+    users_added = diff_map["src/users.py"].added_lines
+    assert users_added is not None
+    assert 40 in users_added
+    assert 41 in users_added
+    assert 44 in users_added
 
     assert "requirements.txt" in diff_map
     assert diff_map["requirements.txt"].status == "A"
-    assert 1 in diff_map["requirements.txt"].added_lines
-    assert 2 in diff_map["requirements.txt"].added_lines
+    reqs_added = diff_map["requirements.txt"].added_lines
+    assert reqs_added is not None
+    assert 1 in reqs_added
+    assert 2 in reqs_added
 
     assert "old_file.py" in diff_map
     assert diff_map["old_file.py"].status == "D"
@@ -226,3 +230,51 @@ dependencies = ["unimported-pkg"]
     assert result.changed_files_count == 1
     assert "pyproject.toml" in result.changed_files
     assert result.affected_checks_count >= 1
+
+
+def test_pr_analyzer_deletion_only_diff(tmp_path: Path):
+    """Verify deletion-only diff does not mark line-numbered diagnostics on unchanged lines as new."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """[project]
+name = "deletion-diff-test"
+version = "0.1.0"
+dependencies = []
+""",
+        encoding="utf-8",
+    )
+
+    users_py = src_dir / "users.py"
+    users_py.write_text(
+        """from fastapi import FastAPI
+import time
+
+app = FastAPI()
+
+@app.get("/users")
+async def get_users():
+    time.sleep(1) # line 8
+    return []
+""",
+        encoding="utf-8",
+    )
+
+    # Diff that only deletes comments at lines 15-20 (0 lines added)
+    diff_content = """diff --git a/src/users.py b/src/users.py
+--- a/src/users.py
++++ b/src/users.py
+@@ -15,5 +15,0 @@
+-# deleted comment 1
+-# deleted comment 2
+"""
+    analyzer = PRAnalyzer(project_root=tmp_path)
+    result = analyzer.analyze(diff_text=diff_content)
+
+    assert result.project_name == "deletion-diff-test"
+    # Line 8 issue (blocking IO in async endpoint) is NOT in added lines, so it is excluded
+    assert not any(d.line == 8 for d in result.new_issues)
+    assert not any(d.id == "FAP-021" for d in result.new_issues)
+    # Any matching diagnostics must be whole-file (line=None)
+    assert all(d.line is None for d in result.new_issues)
