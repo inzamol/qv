@@ -6,10 +6,57 @@ from pathlib import Path
 
 from qv.core.baseline import save_baseline
 from qv.core.models import Diagnostic, ScanResult, Severity
-from qv.core.pr import PRAnalyzer
+from qv.core.pr import PRAnalyzer, _normalize_path
+
+
+def test_normalize_path_edge_cases():
+    """Verify _normalize_path correctly handles prefixes without corrupting path names."""
+    assert _normalize_path("b/build/app.py") == "b/build/app.py"
+    assert _normalize_path("b/bin/x.py") == "b/bin/x.py"
+    assert _normalize_path(".github/workflows/ci.yml") == ".github/workflows/ci.yml"
+    assert _normalize_path("./.github/workflows/ci.yml") == ".github/workflows/ci.yml"
+    assert _normalize_path(".\\build\\app.py") == "build/app.py"
+    assert _normalize_path("/app/main.py") == "app/main.py"
+    assert _normalize_path("build/app.py") == "build/app.py"
+
+
+def test_parse_unified_diff_special_paths():
+    """Verify parse_unified_diff preserves directory names starting with b, bin, build, .github."""
+    diff_text = """diff --git a/build/app.py b/build/app.py
+index 1111111..2222222 100644
+--- a/build/app.py
++++ b/build/app.py
+@@ -10,2 +10,3 @@
+ def build():
++    pass
+diff --git a/bin/tool.py b/bin/tool.py
+new file mode 100644
+--- /dev/null
++++ b/bin/tool.py
+@@ -0,0 +1 @@
++print('cli')
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 3333333..4444444 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -5,1 +5,2 @@
++      - run: qv pr
+"""
+    diff_map = PRAnalyzer.parse_unified_diff(diff_text)
+    assert "build/app.py" in diff_map
+    assert "uild/app.py" not in diff_map
+    assert diff_map["build/app.py"].status == "M"
+
+    assert "bin/tool.py" in diff_map
+    assert "in/tool.py" not in diff_map
+    assert diff_map["bin/tool.py"].status == "A"
+
+    assert ".github/workflows/ci.yml" in diff_map
+    assert "github/workflows/ci.yml" not in diff_map
 
 
 def test_parse_unified_diff():
+    """Verify unified diff parsing extracts correct file paths, statuses, and added line sets."""
     diff_text = """diff --git a/src/users.py b/src/users.py
 index 1234567..89abcdef 100644
 --- a/src/users.py
@@ -52,6 +99,7 @@ deleted file mode 100644
 
 
 def test_pr_analyzer_with_diff(tmp_path: Path):
+    """Verify PRAnalyzer detects new diagnostics introduced in modified diff lines."""
     # Setup test project
     src_dir = tmp_path / "src"
     src_dir.mkdir()
@@ -101,6 +149,7 @@ async def get_users():
 
 
 def test_pr_analyzer_with_baseline(tmp_path: Path):
+    """Verify PRAnalyzer accurately tracks resolved baseline issues and new findings."""
     # Setup project with baseline
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
@@ -160,6 +209,7 @@ dependencies = [
 
 
 def test_pr_analyzer_explicit_files(tmp_path: Path):
+    """Verify PRAnalyzer correctly handles explicit changed files list."""
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
         """[project]

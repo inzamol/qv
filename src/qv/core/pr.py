@@ -43,6 +43,7 @@ class ResolvedIssue:
     category: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert resolved issue to dictionary format."""
         return {
             "id": self.id,
             "title": self.title,
@@ -73,17 +74,21 @@ class PRAnalysisResult:
 
     @property
     def new_errors_count(self) -> int:
+        """Return the count of new blocking error diagnostics."""
         return sum(1 for d in self.new_issues if d.severity == Severity.ERROR)
 
     @property
     def new_warnings_count(self) -> int:
+        """Return the count of new warning diagnostics."""
         return sum(1 for d in self.new_issues if d.severity == Severity.WARNING)
 
     @property
     def has_blocking_errors(self) -> bool:
+        """Return True if any new blocking errors were introduced."""
         return self.new_errors_count > 0
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert PR analysis result to structured dictionary format."""
         return {
             "project_name": self.project_name,
             "project_path": self.project_path,
@@ -119,10 +124,19 @@ PROJECT_CONFIG_FILES = {
 }
 
 
+def _normalize_path(path_str: str) -> str:
+    """Normalize file path to POSIX format without leading './' or leading '/'."""
+    norm = path_str.replace("\\", "/").strip()
+    if norm.startswith("./"):
+        norm = norm[2:]
+    return norm.lstrip("/")
+
+
 class PRAnalyzer:
     """Analyzes only the changed code in a Pull Request against a base branch or baseline."""
 
     def __init__(self, project_root: Path | str = ".") -> None:
+        """Initialize PR analyzer with project root path."""
         self.project_root = Path(project_root).resolve()
 
     def detect_base_ref(self) -> str | None:
@@ -178,8 +192,8 @@ class PRAnalyzer:
                 # e.g. diff --git a/foo/bar.py b/foo/bar.py
                 parts = line.split(" ")
                 if len(parts) >= 4:
-                    b_path = parts[3].lstrip("b/")
-                    current_file = b_path.replace("\\", "/")
+                    raw_b_path = parts[3].removeprefix("b/")
+                    current_file = _normalize_path(raw_b_path)
                     current_info = FileDiffInfo(path=current_file, status="M")
                     file_diffs[current_file] = current_info
             elif line.startswith("new file mode ") and current_info:
@@ -189,14 +203,14 @@ class PRAnalyzer:
             elif line.startswith("rename from ") and current_info:
                 current_info.status = "R"
             elif line.startswith("rename to ") and current_info:
-                new_path = line[len("rename to ") :].strip().replace("\\", "/")
+                new_path = _normalize_path(line.removeprefix("rename to ").strip())
                 current_file = new_path
                 current_info.path = new_path
                 file_diffs[new_path] = current_info
             elif line.startswith("+++ b/"):
-                target = line[6:].strip().replace("\\", "/")
-                if target != "/dev/null":
-                    current_file = target
+                target_raw = line.removeprefix("+++ b/").strip()
+                if target_raw != "/dev/null":
+                    current_file = _normalize_path(target_raw)
                     if current_file not in file_diffs:
                         current_info = FileDiffInfo(path=current_file, status="M")
                         file_diffs[current_file] = current_info
@@ -350,7 +364,7 @@ class PRAnalyzer:
         # Merge explicitly specified changed files
         if changed_files_list:
             for cf in changed_files_list:
-                norm_cf = cf.replace("\\", "/").lstrip("./")
+                norm_cf = _normalize_path(cf)
                 if norm_cf not in file_diffs:
                     file_diffs[norm_cf] = FileDiffInfo(path=norm_cf, status="A")
 
@@ -359,7 +373,7 @@ class PRAnalyzer:
         if not changed_files_keys and not base_ref and not baseline_path:
             # Treat all head diagnostics files as changed
             changed_files_keys = list(
-                {d.file.replace("\\", "/") for d in head_result.diagnostics if d.file}
+                {_normalize_path(d.file) for d in head_result.diagnostics if d.file}
             )
 
         # 3. Obtain base diagnostics (from git base ref scan or baseline snapshot)
@@ -434,7 +448,7 @@ class PRAnalyzer:
                     new_issues.append(diag)
                     continue
 
-                norm_file = diag.file.replace("\\", "/").lstrip("./")
+                norm_file = _normalize_path(diag.file)
                 is_changed = False
 
                 # Exact or suffix match in changed files

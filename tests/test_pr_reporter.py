@@ -12,6 +12,7 @@ from qv.reporters.pr_reporter import PRReporter
 
 
 def test_pr_reporter_terminal_output():
+    """Verify PRReporter formats terminal output matching PR analysis specification."""
     new_diag1 = Diagnostic(
         id="FAP-021",
         severity=Severity.ERROR,
@@ -67,6 +68,7 @@ def test_pr_reporter_terminal_output():
 
 
 def test_pr_reporter_annotations_and_step_summary(tmp_path: Path, capsys):
+    """Verify PRReporter emits workflow command annotations and appends to step summary."""
     new_diag = Diagnostic(
         id="FAP-021",
         severity=Severity.ERROR,
@@ -116,6 +118,7 @@ def test_pr_reporter_annotations_and_step_summary(tmp_path: Path, capsys):
 
 
 def test_pr_reporter_clean_state():
+    """Verify PRReporter produces clean outputs when no new issues or regressions exist."""
     pr_result = PRAnalysisResult(
         project_name="clean-app",
         project_path="/app",

@@ -15,6 +15,7 @@ class PRReporter:
     """Renders PR Intelligence reports to terminal, GitHub Actions step summary, and PR comment markdown."""
 
     def __init__(self, console: Console | None = None) -> None:
+        """Initialize PRReporter with an optional Rich console."""
         self.console = console or Console(color_system="auto")
 
     def print_result(self, result: PRAnalysisResult, console: Console | None = None) -> None:

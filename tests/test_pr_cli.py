@@ -11,6 +11,7 @@ from qv.cli.main import cli
 
 
 def test_pr_cli_basic(tmp_path: Path):
+    """Verify basic qv pr command execution returns 0 and expected terminal sections."""
     runner = CliRunner()
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
@@ -29,6 +30,7 @@ dependencies = []
 
 
 def test_pr_cli_json_and_sarif(tmp_path: Path):
+    """Verify qv pr --json and --sarif generate valid structured output."""
     runner = CliRunner()
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
@@ -56,6 +58,7 @@ dependencies = ["unimported-lib"]
 
 
 def test_pr_cli_comment_and_output(tmp_path: Path):
+    """Verify qv pr --comment generates Markdown and supports file output."""
     runner = CliRunner()
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
@@ -81,6 +84,7 @@ dependencies = []
 
 
 def test_pr_cli_scan_flag(tmp_path: Path):
+    """Verify qv scan --pr activates PR differential analysis mode."""
     runner = CliRunner()
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
@@ -98,6 +102,7 @@ dependencies = []
 
 
 def test_pr_analysis_alias(tmp_path: Path):
+    """Verify qv pr-analysis alias executes identically to qv pr."""
     runner = CliRunner()
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(

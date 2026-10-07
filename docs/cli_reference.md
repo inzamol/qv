@@ -362,6 +362,11 @@ qv framework --name fastapi
 # Scan specifically for Django issues
 qv framework --name django
 
+# Scan specifically for Celery issues
+qv framework --name celery
+
+# Scan specifically for SQLAlchemy / SQL database issues
+qv framework --name sqlalchemy
 ```
 
 ---

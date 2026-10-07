@@ -102,6 +102,7 @@ def _run_analysis_pipeline(
         with console.status("[bold cyan]Scanning project...[/bold cyan]", spinner="dots") as status:
 
             def update_status(name: str) -> None:
+                """Update spinner status label with currently executing analyzer name."""
                 status.update(f"[bold cyan]Running [bold white]{name}[/bold white]...[/bold cyan]")
 
             result = engine.run(project.context, on_progress=update_status)
@@ -874,6 +875,7 @@ def pr_cmd(
             ) as status:
 
                 def update_status(name: str) -> None:
+                    """Update spinner status label with currently executing analyzer name."""
                     status.update(
                         f"[bold cyan]Running [bold white]{name}[/bold white]...[/bold cyan]"
                     )
