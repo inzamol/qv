@@ -84,3 +84,13 @@ When adding a diagnostic rule (e.g. `FAP-035` or `DEP-007`):
 3. **Package Normalization**: Use `packaging.utils.canonicalize_name` when comparing package names to avoid mismatch bugs (e.g. `uvicorn[standard]` vs `uvicorn`, `PyYAML` vs `pyyaml`).
 4. **Safe Remediations**: Only deterministic, safe fixes should be automated. Destructive changes must require explicit flags or user confirmation.
 5. **Cross-Platform Compatibility**: Always account for Windows path separators and terminal UTF-8 encoding.
+6. **Architecture Graph Component Boundaries**:
+   - **Never use file-count thresholds** (e.g. `len(files) > 10`) to shift component classification depth. In flat layouts (e.g. `api/v1/users.py`, `services/billing/charge.py`), nested subdirectories must not override the top-level architectural layer (`api`, `services`).
+   - **Only treat `clean_parts[1]` as a subpackage when `clean_parts[0]` is a verified package root** (e.g. `pkg_name`, `"qv"`, or discovered roots under `src/` or `lib/`).
+   - **Do not create phantom components for package-root files**: `__init__.py`, `__main__.py`, and `version.py` at the root must not create a separate component (like `qv`) that creates artificial cycles with subpackages (`qv <-> cli`).
+7. **Third-Party vs Internal Import Resolution**:
+   - **Never match arbitrary dotted segments of imports to component slugs**: Resolving imports to internal components must only check the top-level segment (`top = mod_name.split(".")[0]`) or registered internal modules. Never iterate all dotted segments (`parts = mod_name.split(".")`), as external imports like `sqlalchemy.orm.Session`, `requests.api.get`, or `click.core` will match internal slugs (`orm`, `api`, `core`) and create fake cycles or layer violations.
+8. **CLI Diagnostic Emission & Strict Verification**:
+   - Any CLI command claiming to check specific rules (e.g. `qv architecture` checking `ARC-001` and `ARC-002`) must actually emit them as standardized `Diagnostic` instances in `ScanResult`, and must fail with exit code `1` when `--strict` is enabled.
+   - Tests must assert specific diagnostic codes (`assert "ARC-001" in result.output`) and must never use fallback passes (such as `"Passed" in result.output`) that mask gaps.
+

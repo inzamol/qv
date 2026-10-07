@@ -85,7 +85,7 @@ This reference details the internal architecture, lifecycle, and component inter
 - `tui/`
   - `app.py`: Textual/Rich interactive terminal user interface.
 - `visualizers/`
-  - `architecture.py`: Architecture map, layer classification, circular component dependencies (`ARC-002`), layer violations (`ARC-001`), and multi-format exports (ASCII, Mermaid, DOT, JSON).
+  - `architecture.py`: Architecture map, layer classification, circular component dependencies (`ARC-002`), layer violations (`ARC-001`), diagnostic conversion (`to_diagnostics()`), and multi-format exports (ASCII, Mermaid, DOT, JSON).
   - `tree.py`: ASCII / Rich tree visualizer for direct & transitive dependencies.
   - `risk_graph.py`: Blast radius and dependency risk visualization.
 
@@ -114,3 +114,19 @@ This reference details the internal architecture, lifecycle, and component inter
 5. **Reporting & Remediation:**
    - Feeds `ScanResult` into selected reporter (Terminal, HTML, SARIF, JSON, Doctor, etc.).
    - If `qv fix` is invoked, `RemediationEngine` generates and applies non-destructive patches.
+
+---
+
+## 4. Architecture Graph & Diagnostic Pipeline (`qv architecture`)
+
+1. **Layer & Component Discovery (`ArchitectureGraph`):**
+   - Discovers components by mapping file paths into architectural folders (e.g. `api`, `services`, `repositories`, `database`, `utils`).
+   - Slices subpackages only when the first path component is a recognized package root (`clean_parts[0] in known_roots`). For flat layouts, uses `clean_parts[0]`.
+   - Resolves target modules to components strictly by matching top-level segments (`mod_name.split(".")[0]`) or registered internal module paths to avoid converting third-party imports into internal edges.
+2. **Cycle & Layer Violation Detection:**
+   - Uses DFS on component adjacency graph to detect cycles (`ARC-002`, `Severity.ERROR`).
+   - Checks layer directionality and skipping rules (e.g. `API` bypassing `Services`/`Repository` to directly import `Database`, or lower layers importing higher layers) (`ARC-001`, `Severity.WARNING`).
+3. **Diagnostic Conversion (`graph.to_diagnostics()`):**
+   - Converts `ArchitectureViolation` instances into standardized `Diagnostic` models with `file`, `line`, `evidence`, `suggestions`, and documentation links.
+   - `architecture_scan_cmd` merges these into `ScanResult` so that standard reporters, `--json`, `--sarif`, and `--strict` exit code checks behave consistently.
+

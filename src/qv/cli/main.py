@@ -21,7 +21,7 @@ from qv.analyzers.imports.analyzer import ImportAnalyzer
 from qv.core.baseline import filter_against_baseline, load_baseline_fingerprints, save_baseline
 from qv.core.config import ConfigurationError
 from qv.core.engine import AnalysisEngine
-from qv.core.models import ScanResult, Severity
+from qv.core.models import Diagnostic, ScanResult, Severity
 from qv.core.pr import PRAnalyzer
 from qv.core.project import load_project
 from qv.frameworks import AVAILABLE_FRAMEWORK_ANALYZERS
@@ -731,21 +731,66 @@ def architecture_group() -> None:
     default=".",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
+@click.option("--strict", is_flag=True, help="Promote warnings to errors.")
 @click.option("--json", "as_json", is_flag=True, help="Output diagnostics in JSON format.")
 @click.option("--sarif", "as_sarif", is_flag=True, help="Output diagnostics in SARIF format.")
-def architecture_scan_cmd(path: Path, as_json: bool, as_sarif: bool) -> None:
+def architecture_scan_cmd(path: Path, strict: bool, as_json: bool, as_sarif: bool) -> None:
     """Run AST and import architecture checks only."""
     with _handle_cli_errors("Architecture analysis"):
         project = load_project(path)
         engine = AnalysisEngine(config=project.config, analyzers=[ImportAnalyzer()])
         result = engine.run(project.context)
+
+        graph = ArchitectureGraph(context=project.context, diagnostics=result.diagnostics)
+        arch_diagnostics = graph.to_diagnostics()
+
+        filtered_arch_diagnostics: list[Diagnostic] = []
+        for diag in arch_diagnostics:
+            if not project.config.is_rule_enabled(diag.id):
+                continue
+            effective_sev = project.config.get_effective_severity(diag.id, diag.severity)
+            if project.config.hide_warnings and effective_sev == Severity.WARNING:
+                continue
+            if project.config.errors_only and effective_sev != Severity.ERROR:
+                continue
+            if project.config.min_severity:
+                sev_order = {Severity.ERROR: 3, Severity.WARNING: 2, Severity.INFO: 1}
+                if sev_order.get(effective_sev, 0) < sev_order.get(project.config.min_severity, 0):
+                    continue
+            filtered_arch_diagnostics.append(diag.model_copy(update={"severity": effective_sev}))
+
+        all_diagnostics = list(result.diagnostics) + filtered_arch_diagnostics
+
+        extra_passed = 0
+        if not any(d.id == "ARC-001" for d in filtered_arch_diagnostics):
+            extra_passed += 1
+        if not any(d.id == "ARC-002" for d in filtered_arch_diagnostics):
+            extra_passed += 1
+
+        scan_result = ScanResult.create(
+            project_name=result.project_name,
+            project_path=result.project_path,
+            python_version=result.python_version,
+            package_manager=result.package_manager,
+            diagnostics=all_diagnostics,
+            checks_passed=result.summary.checks_passed + extra_passed,
+            root_causes=result.root_causes,
+            analyzer_results=result.analyzer_results,
+            metadata=result.metadata,
+        )
+
         if as_json:
-            click.echo(JsonReporter().render(result))
+            click.echo(JsonReporter().render(scan_result))
         elif as_sarif:
-            click.echo(SarifReporter().render(result))
+            click.echo(SarifReporter().render(scan_result))
         else:
-            TerminalReporter(console=console).print_result(result)
-        sys.exit(1 if result.has_blocking_errors else 0)
+            TerminalReporter(console=console).print_result(scan_result)
+        sys.exit(
+            1
+            if scan_result.has_blocking_errors
+            or (strict and scan_result.summary.warnings_count > 0)
+            else 0
+        )
 
 
 @architecture_group.command("graph")

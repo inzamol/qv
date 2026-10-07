@@ -18,7 +18,8 @@ from rich.table import Table
 from rich.text import Text
 
 from qv.core.context import ProjectContext
-from qv.core.models import Diagnostic, Severity
+from qv.core.models import Diagnostic, Evidence, Severity, Suggestion
+from qv.rules.registry import get_rule_definition
 
 
 class LayerRole(str, Enum):
@@ -149,6 +150,8 @@ class ArchitectureViolation:
     evidence: list[str] = field(default_factory=list)
     rule_id: str = "ARC-001"
     severity: Severity = Severity.WARNING
+    file: str | None = None
+    line: int | None = None
 
 
 class ArchitectureGraph:
@@ -182,6 +185,11 @@ class ArchitectureGraph:
             return
 
         pkg_name = self.context.project_name.lower().replace("-", "_")
+        known_roots = {pkg_name, "qv"}
+        for sf in self.context.source_files:
+            p_parts = [p.lower() for p in sf.relative_path.parts]
+            if len(p_parts) >= 3 and p_parts[0] in ("src", "lib"):
+                known_roots.add(p_parts[1])
 
         # 1. Map each source file to candidate component
         for sf in self.context.source_files:
@@ -198,14 +206,18 @@ class ArchitectureGraph:
             clean_parts = [p for p in parts if p not in ("src", "lib", ".")]
 
             # Determine primary subpackage/layer directory
-            if len(clean_parts) >= 3 and (
-                clean_parts[0] == pkg_name
-                or clean_parts[0] == "qv"
-                or len(self.context.source_files) > 10
-            ):
+            if len(clean_parts) >= 3 and clean_parts[0] in known_roots:
                 primary_folder = clean_parts[1]
             elif len(clean_parts) >= 2:
-                primary_folder = clean_parts[0]
+                if clean_parts[0] in known_roots:
+                    if sf.path.stem in ("__init__", "version", "_version"):
+                        continue
+                    if sf.path.stem in ("__main__", "cli"):
+                        primary_folder = "cli"
+                    else:
+                        primary_folder = sf.path.stem.lower()
+                else:
+                    primary_folder = clean_parts[0]
             else:
                 primary_folder = sf.path.stem.lower()
 
@@ -257,11 +269,9 @@ class ArchitectureGraph:
             if mod_name == m or mod_name.startswith(f"{m}."):
                 return comp
 
-        # Check path parts
-        parts = mod_name.lower().split(".")
-        for part in parts:
-            if part in self.components:
-                return part
+        top = mod_name.lower().split(".")[0]
+        if top in self.components:
+            return top
 
         return None
 
@@ -360,11 +370,16 @@ class ArchitectureGraph:
                 ),
             ).name
 
+            sample_file: str | None = None
+            sample_line: int | None = None
             evidence_items: list[str] = []
             for i in range(len(cycle) - 1):
                 k = (cycle[i], cycle[i + 1])
                 if k in self.edges:
                     sample = self.edges[k].imports[0]
+                    if sample_file is None:
+                        sample_file = sample.source_file
+                        sample_line = sample.line_number
                     sym_info = f":{', '.join(sample.symbols)}" if sample.symbols else ""
                     evidence_items.append(
                         f"{sample.source_file}:{sample.line_number} imports {sample.target_module}{sym_info}"
@@ -373,13 +388,15 @@ class ArchitectureGraph:
             self.violations.append(
                 ArchitectureViolation(
                     violation_type="circular_dependency",
-                    title="Circular component dependency",
+                    title="Architectural circular component dependency",
                     source_layer=src_name,
                     target_layer=tgt_name,
                     description=f"Circular dependency cycle detected between architectural components: {cycle_str}",
                     evidence=evidence_items,
                     rule_id="ARC-002",
                     severity=Severity.ERROR,
+                    file=sample_file,
+                    line=sample_line,
                 )
             )
 
@@ -422,6 +439,7 @@ class ArchitectureGraph:
                     for imp in edge.imports[:3]
                 ]
 
+                first_imp = edge.imports[0] if edge.imports else None
                 self.violations.append(
                     ArchitectureViolation(
                         violation_type="layer_violation",
@@ -432,6 +450,8 @@ class ArchitectureGraph:
                         evidence=evidence,
                         rule_id="ARC-001",
                         severity=Severity.WARNING,
+                        file=first_imp.source_file if first_imp else None,
+                        line=first_imp.line_number if first_imp else None,
                     )
                 )
 
@@ -452,6 +472,7 @@ class ArchitectureGraph:
                     for imp in edge.imports[:3]
                 ]
 
+                first_imp = edge.imports[0] if edge.imports else None
                 self.violations.append(
                     ArchitectureViolation(
                         violation_type="layer_violation",
@@ -462,6 +483,8 @@ class ArchitectureGraph:
                         evidence=evidence,
                         rule_id="ARC-001",
                         severity=Severity.WARNING,
+                        file=first_imp.source_file if first_imp else None,
+                        line=first_imp.line_number if first_imp else None,
                     )
                 )
 
@@ -476,6 +499,7 @@ class ArchitectureGraph:
                     for imp in edge.imports[:3]
                 ]
 
+                first_imp = edge.imports[0] if edge.imports else None
                 self.violations.append(
                     ArchitectureViolation(
                         violation_type="layer_violation",
@@ -486,6 +510,8 @@ class ArchitectureGraph:
                         evidence=evidence,
                         rule_id="ARC-001",
                         severity=Severity.WARNING,
+                        file=first_imp.source_file if first_imp else None,
+                        line=first_imp.line_number if first_imp else None,
                     )
                 )
 
@@ -537,6 +563,8 @@ class ArchitectureGraph:
                     "target_layer": v.target_layer,
                     "description": v.description,
                     "evidence": v.evidence,
+                    "file": v.file,
+                    "line": v.line,
                 }
                 for v in self.violations
             ],
@@ -608,6 +636,39 @@ class ArchitectureGraph:
 
         lines.append("}")
         return "\n".join(lines)
+
+    def to_diagnostics(self) -> list[Diagnostic]:
+        """Convert architectural violations to standardized Diagnostic objects."""
+        diagnostics: list[Diagnostic] = []
+        for v in self.violations:
+            rule_def = get_rule_definition(v.rule_id)
+            doc_url = rule_def.doc_url if rule_def else None
+            hint = (
+                rule_def.remediation_hint
+                if rule_def
+                else "Decouple architectural dependencies to conform with layering principles."
+            )
+            title = rule_def.title if rule_def else v.title
+
+            diag = Diagnostic(
+                id=v.rule_id,
+                severity=v.severity,
+                category="architecture",
+                title=title,
+                message=v.description,
+                file=v.file,
+                line=v.line,
+                doc_url=doc_url,
+                evidence=[Evidence(fact=ev, source="ArchitectureGraph") for ev in v.evidence],
+                suggestions=[Suggestion(description=hint, is_safe=False)],
+                metadata={
+                    "source_layer": v.source_layer,
+                    "target_layer": v.target_layer,
+                    "violation_type": v.violation_type,
+                },
+            )
+            diagnostics.append(diag)
+        return diagnostics
 
 
 class ArchitectureVisualizer:

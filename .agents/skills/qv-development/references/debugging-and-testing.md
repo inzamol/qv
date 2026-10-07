@@ -81,3 +81,19 @@ uv run mkdocs serve
 ### 6. Safe Remediations & TOML Formatting
 - **Symptom:** `pyproject.toml` loses comments or formatting when running `qv fix`.
 - **Rule:** Never use standard `tomli_w` or dictionary dump for auto-fixes. Always use `tomlkit` document editing to preserve comments, indentation, and structure.
+
+### 7. False Architecture Cycles / Violations from Third-Party Imports
+- **Symptom:** `qv architecture graph --strict` or `qv architecture --strict` fails with unexpected `ARC-001` or `ARC-002` violations involving common third-party libraries (e.g. `sqlalchemy.orm`, `requests.api`, `click.core`).
+- **Cause:** `_resolve_module_to_component` was matching arbitrary sub-segments of imported module paths against component slugs.
+- **Rule:** Only resolve imports to internal components by matching the top-level segment (`mod_name.split(".")[0]`) or registered internal module paths. Never split into all segments.
+
+### 8. Flat-Layout vs `src`-Layout Component Misclassification
+- **Symptom:** In projects without a `src/` directory, subdirectories like `api/v1/users.py` or `services/billing/charge.py` get assigned component slugs `v1` or `billing` instead of `api` or `services`.
+- **Cause:** Relying on file count thresholds (e.g. `len(files) > 10`) to switch path segment slicing.
+- **Rule:** Only use `clean_parts[1]` as a subpackage when `clean_parts[0]` is a verified root package (`pkg_name`, `"qv"`, or discovered under `src/` / `lib/`). Otherwise, use `clean_parts[0]` as the primary layer component.
+
+### 9. CLI Tests Hiding Missing Diagnostics
+- **Symptom:** CLI command is supposed to report a specific diagnostic code (e.g. `ARC-001`), but users report exit code 0 and missing diagnostics.
+- **Cause:** Tests use permissive assertions like `assert "ARC-001" in output or "Passed" in output`.
+- **Rule:** Never allow generic `"Passed"` fallbacks when testing that a command emits specific rule diagnostics. Always test both the non-strict output and `--strict` exit code 1 behavior.
+

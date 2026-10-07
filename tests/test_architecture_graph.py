@@ -10,6 +10,7 @@ from qv.core.context import (
     PythonRuntime,
     SourceFile,
 )
+from qv.core.models import Severity
 from qv.visualizers.architecture import (
     ArchitectureGraph,
     ArchitectureVisualizer,
@@ -215,3 +216,132 @@ def test_architecture_graph_json_serialization(tmp_path: Path):
     assert data["summary"]["is_healthy"] is False
     assert data["summary"]["circular_dependencies_count"] >= 1
     assert data["summary"]["layer_violations_count"] >= 1
+
+
+def test_architecture_graph_to_diagnostics(tmp_path: Path):
+    context = _build_layered_project(tmp_path)
+    graph = ArchitectureGraph(context=context)
+    diagnostics = graph.to_diagnostics()
+
+    rule_ids = {d.id for d in diagnostics}
+    assert "ARC-001" in rule_ids
+    assert "ARC-002" in rule_ids
+
+    arc_001 = next(d for d in diagnostics if d.id == "ARC-001")
+    assert arc_001.category == "architecture"
+    assert arc_001.severity == Severity.WARNING
+    assert arc_001.file is not None
+    assert "api/users.py" in str(arc_001.file)
+    assert arc_001.line == 2
+
+    arc_002 = next(d for d in diagnostics if d.id == "ARC-002")
+    assert arc_002.category == "architecture"
+    assert arc_002.severity == Severity.ERROR
+
+
+def test_flat_layout_many_files_classification(tmp_path: Path):
+    runtime = PythonRuntime("3.12.0", 3, 12, 0)
+    source_files = []
+    # Create 12 files in flat layout with nested subdirectories (> 10 files)
+    for i in range(6):
+        p1 = tmp_path / "api" / f"v{i}" / f"user_{i}.py"
+        p1.parent.mkdir(parents=True, exist_ok=True)
+        source_files.append(
+            SourceFile(
+                path=p1,
+                relative_path=p1.relative_to(tmp_path),
+                content="def f(): pass",
+                module_name=f"api.v{i}.user_{i}",
+            )
+        )
+        p2 = tmp_path / "services" / f"sub_{i}" / f"svc_{i}.py"
+        p2.parent.mkdir(parents=True, exist_ok=True)
+        source_files.append(
+            SourceFile(
+                path=p2,
+                relative_path=p2.relative_to(tmp_path),
+                content="def f(): pass",
+                module_name=f"services.sub_{i}.svc_{i}",
+            )
+        )
+
+    context = ProjectContext(
+        project_root=tmp_path,
+        project_name="flat-demo",
+        python_runtime=runtime,
+        package_manager="uv",
+        manifest_files=(),
+        lock_files=(),
+        dependencies=(),
+        installed_packages={},
+        source_files=tuple(source_files),
+        imports=(),
+        docker=DockerConfig(has_dockerfile=False),
+        ci=CIConfig(has_ci=False),
+    )
+
+    graph = ArchitectureGraph(context=context)
+    # Must identify "api" and "services" as primary components, not "v0" or "sub_0"
+    assert "api" in graph.components
+    assert "services" in graph.components
+    assert graph.components["api"].role == LayerRole.PRESENTATION
+    assert graph.components["services"].role == LayerRole.APPLICATION
+
+
+def test_resolve_module_third_party_not_matched_to_internal_component(tmp_path: Path):
+    runtime = PythonRuntime("3.12.0", 3, 12, 0)
+    api_file = tmp_path / "api" / "routes.py"
+    core_file = tmp_path / "core" / "engine.py"
+    api_file.parent.mkdir(parents=True, exist_ok=True)
+    core_file.parent.mkdir(parents=True, exist_ok=True)
+
+    context = ProjectContext(
+        project_root=tmp_path,
+        project_name="tp-demo",
+        python_runtime=runtime,
+        package_manager="uv",
+        manifest_files=(),
+        lock_files=(),
+        dependencies=(),
+        installed_packages={},
+        source_files=(
+            SourceFile(
+                path=api_file,
+                relative_path=api_file.relative_to(tmp_path),
+                content="import requests.api\nfrom click.core import BaseCommand",
+                module_name="api.routes",
+            ),
+            SourceFile(
+                path=core_file,
+                relative_path=core_file.relative_to(tmp_path),
+                content="from sqlalchemy.orm import Session",
+                module_name="core.engine",
+            ),
+        ),
+        imports=(
+            ImportRecord(
+                module_name="requests.api",
+                source_file=core_file,
+                line_number=1,
+                is_relative=False,
+                imported_symbols=(),
+            ),
+            ImportRecord(
+                module_name="click.core",
+                source_file=api_file,
+                line_number=2,
+                is_relative=False,
+                imported_symbols=("BaseCommand",),
+            ),
+        ),
+        docker=DockerConfig(has_dockerfile=False),
+        ci=CIConfig(has_ci=False),
+    )
+
+    graph = ArchitectureGraph(context=context)
+    # Third-party dotted segments must not be resolved to internal components
+    assert graph._resolve_module_to_component("requests.api") is None
+    assert graph._resolve_module_to_component("click.core") is None
+    assert graph._resolve_module_to_component("sqlalchemy.orm") is None
+    # No false edges should have been created
+    assert len(graph.edges) == 0

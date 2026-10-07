@@ -50,11 +50,28 @@ def test_cli_architecture_scan_default(tmp_path: Path):
 
     result = runner.invoke(cli, ["architecture", str(repo_path)])
     assert result.exit_code == 0
-    assert (
-        "ARC-001" in result.output
-        or "Architecture layer violation" in result.output
-        or "Passed" in result.output
-    )
+    assert "ARC-001" in result.output
+    assert "Architecture layer violation" in result.output
+
+
+def test_cli_architecture_scan_strict(tmp_path: Path):
+    repo_path = _setup_layered_repo(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["architecture", str(repo_path), "--strict"])
+    assert result.exit_code == 1
+    assert "ARC-001" in result.output
+
+
+def test_cli_architecture_scan_json(tmp_path: Path):
+    repo_path = _setup_layered_repo(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["architecture", "scan", str(repo_path), "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    rule_ids = [d["id"] for d in data.get("diagnostics", [])]
+    assert "ARC-001" in rule_ids
 
 
 def test_cli_architecture_graph_subcommand(tmp_path: Path):
