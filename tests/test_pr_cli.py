@@ -121,6 +121,7 @@ dependencies = []
 
 def test_scan_pr_options_and_sarif_metadata(tmp_path: Path, monkeypatch):
     """Verify scan --pr respects --strict, --hide-warnings, --errors-only, and emits true metadata in SARIF."""
+    monkeypatch.delenv("GITHUB_BASE_REF", raising=False)
     runner = CliRunner()
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(

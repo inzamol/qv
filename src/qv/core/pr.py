@@ -154,7 +154,9 @@ class PRAnalyzer:
             for candidate in [f"origin/{gh_base}", gh_base]:
                 if self._git_ref_exists(candidate):
                     return candidate
-            return gh_base
+            if self._is_git_repo():
+                return gh_base
+            return None
 
         # 2. Check common git branches
         common_candidates = [
@@ -391,7 +393,7 @@ class PRAnalyzer:
                     file_diffs[norm_cf] = FileDiffInfo(path=norm_cf, status="A")
 
         # If no changed files detected (e.g. no git history or diff), default to all files touched by head diagnostics
-        if not file_diffs and not base_ref and not baseline_path:
+        if not file_diffs and not baseline_path:
             for d in head_result.diagnostics:
                 if d.file:
                     norm_f = _normalize_path(d.file)
@@ -465,6 +467,13 @@ class PRAnalyzer:
             total_base_count = len(baseline_records)
 
         else:
+            # Fallback if no base scan could be extracted
+            if not file_diffs:
+                for d in head_result.diagnostics:
+                    if d.file:
+                        norm_f = _normalize_path(d.file)
+                        file_diffs[norm_f] = FileDiffInfo(path=norm_f, status="A")
+
             # Diff-line and changed-file heuristic matching
             for diag in head_result.diagnostics:
                 if not diag.file:
