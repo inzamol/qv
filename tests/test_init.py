@@ -148,7 +148,7 @@ def test_init_ci_github_uv(tmp_path: Path) -> None:
     assert wf_file.exists()
     wf_content = wf_file.read_text(encoding="utf-8")
     assert "astral-sh/setup-uv@v5" in wf_content
-    assert "uv run qv scan --ci --github-annotations" in wf_content
+    assert "uvx --from python-qv qv scan --ci --github-annotations" in wf_content
 
     # Validate against CIAnalyzer
     project = load_project(tmp_path)

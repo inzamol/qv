@@ -164,7 +164,7 @@ jobs:
         run: uv python install {py_version}
 
       - name: Run QV Health Scan
-        run: uv run qv scan --ci --github-annotations
+        run: uvx --from python-qv qv scan --ci --github-annotations
 """
 
     return f"""name: QV Project Health Scan

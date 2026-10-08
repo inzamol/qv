@@ -70,6 +70,9 @@ qv init --dry-run --ci github
 qv init --force
 ```
 
+> [!NOTE]
+> When generating CI workflows (`qv init --ci github`), QV automatically detects package managers. For `uv` projects (`uv.lock` present), it configures `uvx --from python-qv qv scan --ci --github-annotations`, allowing `qv` to run in an ephemeral tool environment without requiring `python-qv` to be added as a project dependency. For standard pip projects, it installs `python-qv` and runs `qv scan --ci --github-annotations`.
+
 ---
 
 ## 3. `qv doctor`
