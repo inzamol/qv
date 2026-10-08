@@ -21,6 +21,7 @@ from qv.analyzers.imports.analyzer import ImportAnalyzer
 from qv.core.baseline import filter_against_baseline, load_baseline_fingerprints, save_baseline
 from qv.core.config import ConfigurationError
 from qv.core.engine import AnalysisEngine
+from qv.core.init import init_github_workflow, init_pyproject
 from qv.core.models import Diagnostic, ScanResult, Severity
 from qv.core.pr import PRAnalyzer
 from qv.core.project import load_project
@@ -293,6 +294,81 @@ def doctor_cmd(
         )
 
 
+@cli.command("init")
+@click.argument(
+    "path",
+    default=".",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--ci",
+    "ci_platform",
+    type=click.Choice(["github"], case_sensitive=False),
+    default=None,
+    help="Generate CI workflow configuration (e.g. github).",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Overwrite existing [tool.qv] configuration or CI workflow.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview generated configuration without writing changes to disk.",
+)
+def init_cmd(
+    path: Path,
+    ci_platform: str | None,
+    force: bool,
+    dry_run: bool,
+) -> None:
+    """Initialize project health configuration and optional CI workflow.
+
+    Generates or updates the [tool.qv] table in pyproject.toml without destroying
+    existing settings. If --ci github is specified, also creates .github/workflows/qv.yml.
+    """
+    with _handle_cli_errors("Project initialization"):
+        target_dir = path.resolve()
+
+        # 1. Initialize pyproject.toml
+        modified_pyproject, pyproject_msg, pyproject_content = init_pyproject(
+            project_root=target_dir,
+            force=force,
+            dry_run=dry_run,
+        )
+
+        if dry_run:
+            console.print(
+                f"[bold cyan]--- {target_dir / 'pyproject.toml'} (dry-run) ---[/bold cyan]"
+            )
+            console.print(pyproject_content, markup=False)
+        else:
+            if modified_pyproject:
+                console.print(f"[green]{pyproject_msg}[/green]")
+            else:
+                console.print(f"[yellow]{pyproject_msg}[/yellow]")
+
+        # 2. Optionally initialize CI workflow
+        if ci_platform:
+            ci_plat_lower = ci_platform.lower()
+            if ci_plat_lower == "github":
+                modified_wf, wf_msg, wf_content, wf_path = init_github_workflow(
+                    project_root=target_dir,
+                    force=force,
+                    dry_run=dry_run,
+                )
+                if dry_run:
+                    console.print(f"[bold cyan]--- {wf_path} (dry-run) ---[/bold cyan]")
+                    console.print(wf_content, markup=False)
+                else:
+                    if modified_wf:
+                        console.print(f"[green]{wf_msg}[/green]")
+                    else:
+                        console.print(f"[yellow]{wf_msg}[/yellow]")
+
+
 @cli.command("scan")
 @click.argument(
     "path",
@@ -540,54 +616,6 @@ def explain(rule_id: str) -> None:
         padding=(1, 2),
     )
     console.print(panel)
-
-
-@cli.command("init")
-@click.argument(
-    "path",
-    default=".",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-)
-def init_cmd(path: Path) -> None:
-    """Initialize qv configuration in pyproject.toml without overwriting existing settings."""
-    pyproject_path = path / "pyproject.toml"
-    default_section = """
-[tool.qv]
-[tool.qv.rules]
-DEP-001 = "error"
-DEP-002 = "error"
-DEP-003 = "warning"
-DEP-004 = "warning"
-DEP-005 = "warning"
-IMP-001 = "error"
-IMP-002 = "error"
-
-[tool.qv.paths]
-exclude = [
-    ".venv",
-    "build",
-    "dist",
-    "node_modules",
-]
-"""
-    if not pyproject_path.exists():
-        pyproject_path.write_text(default_section.lstrip(), encoding="utf-8")
-        console.print(
-            f"[green]Created {pyproject_path} with default [tool.qv] configuration.[/green]"
-        )
-        return
-
-    content = pyproject_path.read_text(encoding="utf-8")
-    if "[tool.qv]" in content or "[tool.pydoctor]" in content:
-        console.print(
-            "[yellow]pyproject.toml already contains [tool.qv] configuration. Skipping.[/yellow]"
-        )
-        return
-
-    # Append to existing
-    updated = content.rstrip() + "\n" + default_section
-    pyproject_path.write_text(updated, encoding="utf-8")
-    console.print(f"[green]Added [tool.qv] configuration to {pyproject_path}.[/green]")
 
 
 @cli.command("dependency")

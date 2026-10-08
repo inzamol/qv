@@ -68,18 +68,32 @@ Before running extensive scans or configuring custom rule thresholds, initialize
 qv init
 ```
 
-This creates a default `[tool.qv]` configuration block without overwriting any of your existing project settings:
+This creates a standard `[tool.qv]` configuration block without overwriting any of your existing project settings:
 
 ```toml
 [tool.qv]
+min_severity = "warning"
+
+[tool.qv.dependencies]
+ignore = [
+    "amqp",
+]
+
 [tool.qv.rules]
-DEP-001 = "error"
-DEP-002 = "error"
 DEP-003 = "warning"
-IMP-001 = "error"
+SQL-014 = "error"
 
 [tool.qv.paths]
-exclude = [".venv", "build", "dist"]
+exclude = [
+    "tests",
+    "migrations",
+]
+```
+
+You can also generate a ready-to-run GitHub Actions workflow:
+
+```bash
+qv init --ci github
 ```
 
 ---

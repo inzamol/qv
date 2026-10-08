@@ -15,13 +15,43 @@ qv --version
 
 ## 2. `qv init`
 
-Generates or updates the `[tool.qv]` configuration block in your `pyproject.toml` without overwriting existing settings.
+Generates or updates the `[tool.qv]` configuration block in your `pyproject.toml` without overwriting existing settings. Optionally generates a pre-configured CI workflow for GitHub Actions.
 
 ```bash
-qv init [PATH]
+qv init [PATH] [OPTIONS]
 ```
 
-Example:
+### Options
+
+| Option | Type | Description |
+|---|---|---|
+| `--ci [github]` | String | Generate a CI workflow file (`.github/workflows/qv.yml`) configured to run `qv scan --ci --github-annotations`. |
+| `-f, --force` | Flag | Overwrite existing `[tool.qv]` configuration or CI workflow. |
+| `--dry-run` | Flag | Preview generated configuration and workflow without writing changes to disk. |
+
+### Generated Configuration
+
+```toml
+[tool.qv]
+min_severity = "warning"
+
+[tool.qv.dependencies]
+ignore = [
+    "amqp",
+]
+
+[tool.qv.rules]
+DEP-003 = "warning"
+SQL-014 = "error"
+
+[tool.qv.paths]
+exclude = [
+    "tests",
+    "migrations",
+]
+```
+
+### Examples
 
 ```bash
 # Initialize [tool.qv] in current directory
@@ -29,6 +59,15 @@ qv init
 
 # Initialize in a specific project path
 qv init ./services/backend
+
+# Initialize configuration and generate GitHub Actions workflow
+qv init --ci github
+
+# Preview generated configuration without writing to disk
+qv init --dry-run --ci github
+
+# Overwrite existing [tool.qv] block
+qv init --force
 ```
 
 ---
