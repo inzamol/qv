@@ -64,7 +64,7 @@ jobs:
           tag_ver = tag.lstrip('v')
 
           # Floating major tags (e.g. v1, v2) are GitHub Action release tags, not PyPI package releases
-          if tag_ver.isdigit() or '.' not in tag_ver:
+          if tag_ver.isdigit():
               print(f'Skipping PyPI package validation for Action major tag: {tag}')
               sys.exit(0)
 
