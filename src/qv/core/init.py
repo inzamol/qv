@@ -69,9 +69,7 @@ def init_pyproject(
             raise ConfigurationError(f"Failed to parse existing '{pyproject_path}': {e}") from e
 
         tool_table = doc.get("tool")
-        has_qv = isinstance(tool_table, dict) and (
-            "qv" in tool_table or "pydoctor" in tool_table
-        )
+        has_qv = isinstance(tool_table, dict) and ("qv" in tool_table or "pydoctor" in tool_table)
         if has_qv and not force:
             return (
                 False,
