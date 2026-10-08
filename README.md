@@ -96,7 +96,7 @@ jobs:
 | Input | Description | Default |
 |---|---|---|
 | `path` | Path to the Python project directory to analyze | `.` |
-| `version` | Version of `python-qv` to use (`latest`, specific version like `0.1.7`, or `local`) | `latest` |
+| `version` | Version of `python-qv` to use (`latest`, specific version like `1.0.0`, or `local`) | `latest` |
 | `python-version` | Python version used to run qv (`3.10`, `3.11`, `3.12`, `3.13`) | `3.12` |
 | `format` | Output report format (`sarif`, `terminal`, `json`, `html`, `text`) | `sarif` |
 | `output` | Output file path for generated report | `qv-results.sarif` |

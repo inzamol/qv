@@ -13,7 +13,7 @@ inputs:
     default: "."
 
   version:
-    description: "Version of python-qv to use ('latest', specific version like '0.1.7', or 'local' to use repository source)"
+    description: "Version of python-qv to use ('latest', specific version like '1.0.0', or 'local' to use repository source)"
     required: false
     default: "latest"
 
