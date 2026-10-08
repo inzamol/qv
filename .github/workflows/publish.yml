@@ -62,6 +62,12 @@ jobs:
           if not tag.startswith('v'):
               sys.exit(0)
           tag_ver = tag.lstrip('v')
+
+          # Floating major tags (e.g. v1, v2) are GitHub Action release tags, not PyPI package releases
+          if tag_ver.isdigit():
+              print(f'Skipping PyPI package validation for Action major tag: {tag}')
+              sys.exit(0)
+
           pyproject = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))
           toml_ver = pyproject.get('project', {}).get('version', '')
 
@@ -138,7 +144,7 @@ jobs:
   publish-to-pypi:
     name: Publish to PyPI
     needs: [build]
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'release' && github.event.action == 'published') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi')
+    if: (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')) || (github.event_name == 'release' && github.event.action == 'published' && contains(github.ref, '.')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi')
     runs-on: ubuntu-latest
     environment:
       name: pypi

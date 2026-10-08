@@ -1,0 +1,7 @@
+[project]
+name = "action-test-fixture"
+version = "0.1.0"
+description = "Fixture project with intentional issues for action testing"
+dependencies = [
+    "click>=8.1.0",
+]

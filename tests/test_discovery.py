@@ -132,3 +132,40 @@ dependencies = []
     res_hide = runner.invoke(cli, ["scan", str(tmp_path), "--hide-warnings"])
     assert res_hide.exit_code == 0
     assert "DISC-001" not in res_hide.output
+
+
+def test_project_discovery_exclusion_boundaries(tmp_path: Path):
+    """Test that path exclusions match component boundaries, not arbitrary file prefixes."""
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """[project]
+name = "boundary-test"
+version = "0.1.0"
+dependencies = []
+
+[tool.qv.paths]
+exclude = ["build", "env", "tests/fixtures"]
+""",
+        encoding="utf-8",
+    )
+
+    # Root files with matching prefix but different names should NOT be excluded
+    (tmp_path / "build.py").write_text("import sys\n", encoding="utf-8")
+    (tmp_path / "environment.py").write_text("import os\n", encoding="utf-8")
+
+    # Files inside excluded directories SHOULD be excluded
+    build_dir = tmp_path / "build"
+    build_dir.mkdir()
+    (build_dir / "setup.py").write_text("import setuptools\n", encoding="utf-8")
+
+    fixtures_dir = tmp_path / "tests" / "fixtures"
+    fixtures_dir.mkdir(parents=True)
+    (fixtures_dir / "helper.py").write_text("import json\n", encoding="utf-8")
+
+    project = load_project(tmp_path)
+    discovered_names = {f.path.name for f in project.context.source_files}
+
+    assert "build.py" in discovered_names
+    assert "environment.py" in discovered_names
+    assert "setup.py" not in discovered_names
+    assert "helper.py" not in discovered_names

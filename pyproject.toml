@@ -75,6 +75,7 @@ exclude = [
     "/.pre-commit-hooks.yaml",
     "/.readthedocs.yaml",
     "/tox.ini",
+    "/action.yml",
 ]
 
 [tool.ruff]
@@ -119,6 +120,7 @@ exclude = [
     "examples",
     ".venv",
     ".github",
+    "tests/fixtures",
 ]
 
 [tool.qv.paths]
@@ -128,4 +130,6 @@ exclude = [
     "dist",
     "node_modules",
     "examples",
+    "fixtures",
+    "tests/fixtures",
 ]

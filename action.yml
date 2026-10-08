@@ -1,64 +1,117 @@
-name: 'qv Python Health & Dependency Scanner'
-description: 'Diagnose Python project health, dependency conflicts, drift, security CVEs, and circular imports with actionable safe fixes.'
-author: 'Inzamul Hoque'
+name: "qv"
+description: "Python project health and diagnostics for GitHub Actions"
+author: "Inzamul Hoque"
+
+branding:
+  icon: "check-circle"
+  color: "blue"
 
 inputs:
   path:
-    description: 'Path to the Python project directory to scan'
+    description: "Path to the Python project directory to analyze"
     required: false
-    default: '.'
-  strict:
-    description: 'Promote warnings to errors (fails workflow on warnings)'
+    default: "."
+
+  version:
+    description: "Version of python-qv to use ('latest', specific version like '0.1.7', or 'local' to use repository source)"
     required: false
-    default: 'false'
+    default: "latest"
+
+  python-version:
+    description: "Python version used to run qv"
+    required: false
+    default: "3.12"
+
+  format:
+    description: "Output format ('sarif', 'terminal', 'json', 'html', 'text')"
+    required: false
+    default: "sarif"
+
+  output:
+    description: "Output file for report"
+    required: false
+    default: "qv-results.sarif"
+
+  fail-on:
+    description: "Finding severity that causes the workflow to fail ('error', 'warning', 'none')"
+    required: false
+    default: "error"
+
+  github-annotations:
+    description: "Emit GitHub Actions workflow command annotations (::error, ::warning)"
+    required: false
+    default: "true"
+
   offline:
-    description: 'Disable remote vulnerability/CVE queries'
+    description: "Disable remote vulnerability and CVE queries (airgapped mode)"
     required: false
-    default: 'false'
-  sarif:
-    description: 'Generate SARIF v2.1.0 output file for GitHub Code Scanning'
+    default: "false"
+
+  baseline:
+    description: "Path to baseline file to suppress pre-existing findings"
     required: false
-    default: 'false'
+    default: ""
+
+  args:
+    description: "Additional qv CLI arguments"
+    required: false
+    default: ""
+
+outputs:
   sarif-file:
-    description: 'Output filename for SARIF report'
-    required: false
-    default: 'qv-results.sarif'
-  html-report:
-    description: 'Generate self-contained HTML dashboard'
-    required: false
-    default: 'false'
-  html-file:
-    description: 'Output filename for HTML report'
-    required: false
-    default: 'qv-report.html'
+    description: "Path to the generated SARIF file"
+    value: ${{ steps.run-qv.outputs.sarif-file }}
+
+  findings:
+    description: "Total number of diagnostic findings detected (populated for sarif or json formats)"
+    value: ${{ steps.run-qv.outputs.findings }}
+
+  errors:
+    description: "Total number of error findings detected (populated for sarif or json formats)"
+    value: ${{ steps.run-qv.outputs.errors }}
+
+  warnings:
+    description: "Total number of warning findings detected (populated for sarif or json formats)"
+    value: ${{ steps.run-qv.outputs.warnings }}
+
+  exit-code:
+    description: "Exit code returned by qv"
+    value: ${{ steps.run-qv.outputs.exit-code }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
-    - name: Set up uv
-      uses: astral-sh/setup-uv@v5
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        enable-cache: true
+        python-version: ${{ inputs.python-version }}
 
-    - name: Run qv scan
+    - name: Install qv
       shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
-        ARGS="--ci --github-annotations"
-        if [ "${{ inputs.strict }}" = "true" ]; then
-          ARGS="$ARGS --strict"
-        fi
-        if [ "${{ inputs.offline }}" = "true" ]; then
-          ARGS="$ARGS --offline"
-        fi
-        if [ "${{ inputs.sarif }}" = "true" ]; then
-          ARGS="$ARGS --sarif -o ${{ inputs.sarif-file }}"
-        fi
-        if [ "${{ inputs.html-report }}" = "true" ]; then
-          ARGS="$ARGS --html ${{ inputs.html-file }}"
+        if [ "$INPUT_VERSION" = "latest" ] || [ -z "$INPUT_VERSION" ]; then
+          python -m pip install --upgrade python-qv
+        elif [ "$INPUT_VERSION" = "local" ] || [ "$INPUT_VERSION" = "." ]; then
+          python -m pip install "$ACTION_PATH"
+        else
+          python -m pip install "python-qv==$INPUT_VERSION"
         fi
 
-        uv run qv scan "${{ inputs.path }}" $ARGS
-
-branding:
-  icon: 'activity'
-  color: 'blue'
+    - name: Run qv
+      id: run-qv
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_OUTPUT: ${{ inputs.output }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_GITHUB_ANNOTATIONS: ${{ inputs.github-annotations }}
+        INPUT_OFFLINE: ${{ inputs.offline }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
+        INPUT_ARGS: ${{ inputs.args }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        python "$ACTION_PATH/scripts/run_action.py"

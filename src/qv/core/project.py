@@ -595,6 +595,8 @@ class ProjectDiscovery:
         imports: list[ImportRecord] = []
 
         exclude_patterns = set(self.config.paths.exclude)
+        exclude_prefixes = tuple(p.strip("/") + "/" for p in exclude_patterns if p.strip("/"))
+        exclude_exact = {p.strip("/") for p in exclude_patterns if p.strip("/")}
         for py_path in self.root.rglob("*.py"):
             if not self._is_within_boundary(py_path):
                 continue
@@ -602,7 +604,12 @@ class ProjectDiscovery:
             rel_path = py_path.relative_to(self.root)
             # Check exclusions
             parts = rel_path.parts
-            if any(part in exclude_patterns or part.startswith(".") for part in parts):
+            rel_posix = rel_path.as_posix()
+            if (
+                any(part in exclude_patterns or part.startswith(".") for part in parts)
+                or rel_posix in exclude_exact
+                or (exclude_prefixes and rel_posix.startswith(exclude_prefixes))
+            ):
                 continue
 
             try:
