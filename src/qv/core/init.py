@@ -225,11 +225,12 @@ def init_github_workflow(
                 workflow_path,
             )
 
+    existed = workflow_path.exists()
     if not dry_run:
         workflow_dir.mkdir(parents=True, exist_ok=True)
         workflow_path.write_text(rendered, encoding="utf-8")
 
-    action = "Overwrote" if workflow_path.exists() and force else "Created"
+    action = "Overwrote" if existed and force else "Created"
     return (
         True,
         f"{action} GitHub Actions workflow at {workflow_path}.",
