@@ -38,7 +38,7 @@ jobs:
           test "${{ steps.test-clean.outputs.errors }}" = "0"
           test "${{ steps.test-clean.outputs.exit-code }}" = "0"
 
-      - name: Test Project with Known Findings (fail-on: none)
+      - name: "Test Project with Known Findings (fail-on: none)"
         id: test-findings
         uses: ./
         with:
