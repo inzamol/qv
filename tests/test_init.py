@@ -134,6 +134,7 @@ def test_init_ci_github_standard(tmp_path: Path) -> None:
     assert "actions/setup-python@v5" in wf_content
     assert "qv scan --ci --github-annotations" in wf_content
     assert "cancel-in-progress: true" in wf_content
+    assert "contents: read" in wf_content
 
     # Validate against CIAnalyzer
     project = load_project(tmp_path)
@@ -155,6 +156,7 @@ def test_init_ci_github_uv(tmp_path: Path) -> None:
     wf_content = wf_file.read_text(encoding="utf-8")
     assert "astral-sh/setup-uv@v5" in wf_content
     assert "uvx --from python-qv qv scan --ci --github-annotations" in wf_content
+    assert "contents: read" in wf_content
 
     # Validate against CIAnalyzer
     project = load_project(tmp_path)

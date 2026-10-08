@@ -143,6 +143,9 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{{{ github.workflow }}}}-${{{{ github.ref }}}}
   cancel-in-progress: true
@@ -174,6 +177,9 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{{{ github.workflow }}}}-${{{{ github.ref }}}}
