@@ -12,6 +12,7 @@ from qv.core.project import load_project
 
 
 def test_init_new_project_creates_pyproject(tmp_path: Path) -> None:
+    """Create the default QV configuration and verify its parsed settings."""
     runner = CliRunner()
     result = runner.invoke(cli, ["init", str(tmp_path)])
     assert result.exit_code == 0
@@ -51,6 +52,7 @@ exclude = [
 
 
 def test_init_existing_pyproject_without_qv(tmp_path: Path) -> None:
+    """Add QV defaults while preserving existing project metadata."""
     pyproject_file = tmp_path / "pyproject.toml"
     pyproject_file.write_text(
         """[project]
@@ -77,6 +79,7 @@ version = "1.0.0"
 
 
 def test_init_existing_pyproject_with_qv_no_force(tmp_path: Path) -> None:
+    """Preserve existing QV settings and suggest --force when skipping them."""
     pyproject_file = tmp_path / "pyproject.toml"
     initial_content = """[project]
 name = "custom-app"
@@ -97,6 +100,7 @@ min_severity = "info"
 
 
 def test_init_existing_pyproject_with_qv_force(tmp_path: Path) -> None:
+    """Replace QV settings with defaults while retaining project metadata."""
     pyproject_file = tmp_path / "pyproject.toml"
     initial_content = """[project]
 name = "custom-app"
@@ -118,6 +122,7 @@ min_severity = "info"
 
 
 def test_init_ci_github_standard(tmp_path: Path) -> None:
+    """Generate a standard GitHub workflow that passes CI analyzer checks."""
     runner = CliRunner()
     result = runner.invoke(cli, ["init", str(tmp_path), "--ci", "github"])
     assert result.exit_code == 0
@@ -138,6 +143,7 @@ def test_init_ci_github_standard(tmp_path: Path) -> None:
 
 
 def test_init_ci_github_uv(tmp_path: Path) -> None:
+    """Generate a uv GitHub workflow that passes CI analyzer checks."""
     (tmp_path / "uv.lock").write_text("", encoding="utf-8")
 
     runner = CliRunner()
@@ -158,6 +164,7 @@ def test_init_ci_github_uv(tmp_path: Path) -> None:
 
 
 def test_init_ci_github_no_force_skips(tmp_path: Path) -> None:
+    """Preserve an existing GitHub workflow when --force is absent."""
     wf_file = tmp_path / ".github" / "workflows" / "qv.yml"
     wf_file.parent.mkdir(parents=True)
     custom_content = "# Existing custom workflow\n"
@@ -171,6 +178,7 @@ def test_init_ci_github_no_force_skips(tmp_path: Path) -> None:
 
 
 def test_init_ci_github_force_overwrites(tmp_path: Path) -> None:
+    """Replace an existing GitHub workflow when --force is supplied."""
     wf_file = tmp_path / ".github" / "workflows" / "qv.yml"
     wf_file.parent.mkdir(parents=True)
     wf_file.write_text("# Existing custom workflow\n", encoding="utf-8")
@@ -184,6 +192,7 @@ def test_init_ci_github_force_overwrites(tmp_path: Path) -> None:
 
 
 def test_init_dry_run_does_not_modify_disk(tmp_path: Path) -> None:
+    """Preview configuration and workflow content without creating either file."""
     runner = CliRunner()
     result = runner.invoke(cli, ["init", str(tmp_path), "--dry-run", "--ci", "github"])
     assert result.exit_code == 0
@@ -199,6 +208,7 @@ def test_init_dry_run_does_not_modify_disk(tmp_path: Path) -> None:
 
 
 def test_init_invalid_pyproject_syntax(tmp_path: Path) -> None:
+    """Report malformed TOML as a configuration error with exit code 2."""
     pyproject_file = tmp_path / "pyproject.toml"
     pyproject_file.write_text("invalid toml syntax [[[[", encoding="utf-8")
 
