@@ -274,3 +274,48 @@ def test_action_baseline_file_handling(tmp_path: Path):
     result = run_action_script(extra_env)
 
     assert result.returncode == 0
+
+
+def test_action_fail_on_none_propagates_cli_usage_error():
+    """Test that CLI argument errors are NOT suppressed even when fail-on is 'none'."""
+    extra_env = {
+        "INPUT_PATH": str(FIXTURE_CLEAN),
+        "INPUT_FAIL_ON": "none",
+        "INPUT_ARGS": "--non-existent-unrecognized-argument-xyz",
+    }
+
+    result = run_action_script(extra_env)
+
+    # Click exits with code 2 on unknown options; action must propagate failure, not return 0
+    assert result.returncode != 0
+    assert result.returncode == 2 or "No such option" in (result.stderr + result.stdout)
+
+
+def test_action_cleans_stale_report_on_failure(tmp_path: Path):
+    """Test that a pre-existing report is removed and not published if a subsequent scan fails."""
+    stale_sarif = tmp_path / "stale.sarif"
+    stale_sarif.write_text(
+        '{"version":"2.1.0","runs":[{"results":[{"ruleId":"FAKE"}]}]}', encoding="utf-8"
+    )
+    github_output = tmp_path / "github_output.txt"
+
+    extra_env = {
+        "INPUT_PATH": str(FIXTURE_CLEAN),
+        "INPUT_FORMAT": "sarif",
+        "INPUT_OUTPUT": str(stale_sarif),
+        "INPUT_FAIL_ON": "error",
+        "INPUT_ARGS": "--invalid-option-causing-failure",
+        "GITHUB_OUTPUT": str(github_output),
+    }
+
+    result = run_action_script(extra_env)
+
+    assert result.returncode != 0
+    assert not stale_sarif.exists(), (
+        "Stale report must be removed before run and not persist on failure"
+    )
+
+    if github_output.exists():
+        out_content = github_output.read_text(encoding="utf-8")
+        assert "sarif-file=\n" in out_content or "sarif-file=" not in out_content
+        assert "findings=0" in out_content

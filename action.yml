@@ -63,15 +63,15 @@ outputs:
     value: ${{ steps.run-qv.outputs.sarif-file }}
 
   findings:
-    description: "Total number of diagnostic findings detected"
+    description: "Total number of diagnostic findings detected (populated for sarif or json formats)"
     value: ${{ steps.run-qv.outputs.findings }}
 
   errors:
-    description: "Total number of error findings detected"
+    description: "Total number of error findings detected (populated for sarif or json formats)"
     value: ${{ steps.run-qv.outputs.errors }}
 
   warnings:
-    description: "Total number of warning findings detected"
+    description: "Total number of warning findings detected (populated for sarif or json formats)"
     value: ${{ steps.run-qv.outputs.warnings }}
 
   exit-code:

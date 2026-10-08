@@ -111,9 +111,9 @@ jobs:
 | Output | Description |
 |---|---|
 | `sarif-file` | Path to the generated SARIF file |
-| `findings` | Total number of diagnostic findings detected |
-| `errors` | Total number of error findings detected |
-| `warnings` | Total number of warning findings detected |
+| `findings` | Total number of diagnostic findings detected (populated for `sarif` or `json` formats) |
+| `errors` | Total number of error findings detected (populated for `sarif` or `json` formats) |
+| `warnings` | Total number of warning findings detected (populated for `sarif` or `json` formats) |
 | `exit-code` | Exit code returned by `qv` |
 
 ---

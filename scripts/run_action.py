@@ -157,7 +157,15 @@ def main() -> int:
     print(f"qv:      {qv_ver}", flush=True)
     print("", flush=True)
     print("Analyzing project...", flush=True)
-    print("", flush=True)
+    # Clean up any pre-existing report file at destination to ensure only reports from this scan are used
+    expected_report: Path | None = (
+        sarif_output_path if raw_format == "sarif" else (Path(raw_output) if raw_output else None)
+    )
+    if expected_report and expected_report.is_file():
+        try:
+            expected_report.unlink()
+        except OSError:
+            pass
 
     # 7. Execute qv CLI
     process = subprocess.run(cmd)
@@ -170,25 +178,31 @@ def main() -> int:
     info = 0
     sarif_resolved_path = ""
 
-    if sarif_output_path and sarif_output_path.exists() and sarif_output_path.is_file():
-        sarif_resolved_path = str(sarif_output_path)
+    if raw_exit_code in (0, 1) and sarif_output_path and sarif_output_path.is_file():
         try:
             sarif_data = json.loads(sarif_output_path.read_text(encoding="utf-8"))
             runs = sarif_data.get("runs", [])
-            if runs:
-                results = runs[0].get("results", [])
-                findings = len(results)
-                for r in results:
-                    lvl = r.get("level", "warning")
-                    if lvl == "error":
-                        errors += 1
-                    elif lvl == "warning":
-                        warnings += 1
-                    else:
-                        info += 1
+            if isinstance(runs, list):
+                sarif_resolved_path = str(sarif_output_path)
+                if runs:
+                    results = runs[0].get("results", [])
+                    findings = len(results)
+                    for r in results:
+                        lvl = r.get("level", "warning")
+                        if lvl == "error":
+                            errors += 1
+                        elif lvl == "warning":
+                            warnings += 1
+                        else:
+                            info += 1
         except Exception:
-            pass
-    elif raw_format == "json" and raw_output and Path(raw_output).exists():
+            sarif_resolved_path = ""
+    elif (
+        raw_exit_code in (0, 1)
+        and raw_format == "json"
+        and raw_output
+        and Path(raw_output).is_file()
+    ):
         try:
             json_data = json.loads(Path(raw_output).read_text(encoding="utf-8"))
             diags = json_data.get("diagnostics", [])
@@ -240,7 +254,19 @@ def main() -> int:
             _log_warning(f"Failed to write GITHUB_OUTPUT: {e}")
 
     # 11. Determine return code based on fail-on (Section 13)
+    # Only finding-based failures (exit code 1) are eligible to be suppressed by fail-on: none/never.
+    # CLI usage errors (code 2), configuration/runtime errors, or crashes must propagate.
+    if raw_exit_code not in (0, 1):
+        return raw_exit_code
+
     if raw_fail_on in ("none", "never"):
+        # If SARIF was requested but no report was produced on failure, this was an execution failure rather than findings.
+        if (
+            raw_format == "sarif"
+            and raw_exit_code == 1
+            and not (sarif_output_path and sarif_output_path.is_file())
+        ):
+            return raw_exit_code
         return 0
 
     return raw_exit_code
