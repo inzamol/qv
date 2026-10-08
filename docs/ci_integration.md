@@ -6,12 +6,16 @@
 
 ## 1. Official GitHub Action (`inzamol/qv`)
 
-Use the official composite GitHub Action to run `qv` with automated PR annotations and step summaries:
+Use the official composite GitHub Action to run `qv` with automated PR annotations, SARIF reports, and step summaries:
 
 ```yaml
 name: Python Project Health Check
 
 on: [push, pull_request]
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
   qv-check:
@@ -19,12 +23,44 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run qv Health Scan
-        uses: inzamol/qv@v0.1.0
+        uses: inzamol/qv@v1
         with:
-          strict: false
-          sarif: true
-          html-report: true
+          format: sarif
+          output: qv-results.sarif
+          fail-on: error
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: qv-results.sarif
+          category: qv
 ```
+
+### 1.1 Action Inputs & Configuration
+
+| Input | Description | Default |
+|---|---|---|
+| `path` | Path to the Python project directory to analyze | `.` |
+| `version` | Version of `python-qv` to use (`latest`, specific version like `0.1.7`, or `local`) | `latest` |
+| `python-version` | Python version used to run qv (`3.10`, `3.11`, `3.12`, `3.13`) | `3.12` |
+| `format` | Output report format (`sarif`, `terminal`, `json`, `html`, `text`) | `sarif` |
+| `output` | Output file path for generated report | `qv-results.sarif` |
+| `fail-on` | Finding severity causing workflow failure (`error`, `warning`, `none`) | `error` |
+| `github-annotations` | Emit GitHub Actions inline annotations (`::error`, `::warning`) | `true` |
+| `offline` | Disable remote vulnerability queries (airgapped mode) | `false` |
+| `baseline` | Path to baseline snapshot to ignore existing findings | `""` |
+| `args` | Additional CLI arguments to pass to `qv scan` | `""` |
+
+### 1.2 Action Outputs
+
+| Output | Description |
+|---|---|
+| `sarif-file` | Path to the generated SARIF file |
+| `findings` | Total number of diagnostic findings detected |
+| `errors` | Total number of error findings detected |
+| `warnings` | Total number of warning findings detected |
+| `exit-code` | Exit code returned by `qv` |
 
 ---
 
@@ -150,7 +186,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload SARIF report
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
 ```

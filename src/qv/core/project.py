@@ -602,7 +602,10 @@ class ProjectDiscovery:
             rel_path = py_path.relative_to(self.root)
             # Check exclusions
             parts = rel_path.parts
-            if any(part in exclude_patterns or part.startswith(".") for part in parts):
+            rel_posix = rel_path.as_posix()
+            if any(part in exclude_patterns or part.startswith(".") for part in parts) or any(
+                rel_posix.startswith(p.strip("/")) for p in exclude_patterns
+            ):
                 continue
 
             try:

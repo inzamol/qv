@@ -1,0 +1,73 @@
+name: Test GitHub Action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-action:
+    name: Self-Test Marketplace Action
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run qv Action on Clean Project (SARIF Output)
+        id: test-clean
+        uses: ./
+        with:
+          path: tests/fixtures/action-project-clean
+          version: local
+          format: sarif
+          output: clean-results.sarif
+          fail-on: error
+
+      - name: Verify Clean Test Outputs
+        run: |
+          test -f clean-results.sarif
+          test "${{ steps.test-clean.outputs.errors }}" = "0"
+          test "${{ steps.test-clean.outputs.exit-code }}" = "0"
+
+      - name: Test Project with Known Findings (fail-on: none)
+        id: test-findings
+        uses: ./
+        with:
+          path: tests/fixtures/action-project
+          version: local
+          format: sarif
+          output: findings-results.sarif
+          fail-on: none
+
+      - name: Verify Findings Outputs
+        run: |
+          test -f findings-results.sarif
+          test "${{ steps.test-findings.outputs.errors }}" = "2"
+          test "${{ steps.test-findings.outputs.findings }}" = "3"
+          test "${{ steps.test-findings.outputs.exit-code }}" = "1"
+
+      - name: Test Terminal Output Mode
+        uses: ./
+        with:
+          path: tests/fixtures/action-project-clean
+          version: local
+          format: terminal
+          fail-on: error
+
+      - name: Test Custom Arguments & Offline
+        uses: ./
+        with:
+          path: tests/fixtures/action-project-clean
+          version: local
+          offline: "true"
+          args: "--hide-warnings"
+          fail-on: error

@@ -4,16 +4,117 @@
 
 ### Modern diagnostic and health analyzer for Python projects
 
-Diagnose root causes across dependency resolvers, runtime environment drift, circular imports, and framework anti-patterns with safe, actionable fixes.
+> **qv helps you answer:** *"Is my Python project healthy?"*
+>
+> It analyzes dependencies, environment, architecture, imports, packaging, and framework-specific issues and provides actionable diagnostics.
 
 [![PyPI Version](https://img.shields.io/pypi/v/python-qv.svg?style=flat-square&color=2563eb)](https://pypi.org/project/python-qv/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/python-qv.svg?style=flat-square&color=2563eb)](https://pypi.org/project/python-qv/)
+[![GitHub Action](https://img.shields.io/badge/GitHub%20Action-inzamol%2Fqv%40v1-blue?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/marketplace/actions/qv)
 [![CI Status](https://img.shields.io/github/actions/workflow/status/inzamol/qv/ci.yml?branch=main&style=flat-square)](https://github.com/inzamol/qv/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-gray.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-[Installation](#installation) &bull; [Quick Start](#quick-start) &bull; [Interactive TUI](#interactive-tui-explorer) &bull; [Rule Categories](#rule-categories--capabilities) &bull; [CLI Commands](#cli-commands--usage) &bull; [Configuration](#configuration) &bull; [CI/CD Integration](#cicd-integration) &bull; [Documentation](https://inzamol.github.io/qv/)
+[GitHub Action](#github-action) &bull; [Installation](#installation--execution) &bull; [Quick Start](#quick-start) &bull; [Interactive TUI](#interactive-tui-explorer) &bull; [Rule Categories](#rule-categories--capabilities) &bull; [CLI Commands](#cli-commands--usage) &bull; [Documentation](https://inzamol.github.io/qv/)
 
 </div>
+
+---
+
+## GitHub Action
+
+Run `qv` directly in GitHub Actions with zero manual setup:
+
+```yaml
+- uses: inzamol/qv@v1
+```
+
+`qv` runs automatically on:
+- **Pull Requests**: Detect missing dependencies, circular imports, and architecture regressions before merging.
+- **Pushes**: Continuously validate project health on `main` or release branches.
+- **Scheduled Workflows**: Catch newly discovered CVEs or upstream dependency drift.
+- **Manual Workflows**: Trigger on-demand diagnostic audits via `workflow_dispatch`.
+
+### Quick Start Example
+
+```yaml
+name: qv
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  qv:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: inzamol/qv@v1
+```
+
+### GitHub Code Scanning (SARIF) Integration
+
+Emit standard SARIF v2.1.0 diagnostics and upload findings directly to GitHub Code Scanning:
+
+```yaml
+name: qv
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  qv:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: inzamol/qv@v1
+        with:
+          format: sarif
+          output: qv-results.sarif
+
+      - name: Upload qv SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: qv-results.sarif
+          category: qv
+```
+
+### Action Configuration Reference
+
+| Input | Description | Default |
+|---|---|---|
+| `path` | Path to the Python project directory to analyze | `.` |
+| `version` | Version of `python-qv` to use (`latest`, specific version like `0.1.7`, or `local`) | `latest` |
+| `python-version` | Python version used to run qv (`3.10`, `3.11`, `3.12`, `3.13`) | `3.12` |
+| `format` | Output report format (`sarif`, `terminal`, `json`, `html`, `text`) | `sarif` |
+| `output` | Output file path for generated report | `qv-results.sarif` |
+| `fail-on` | Finding severity causing workflow failure (`error`, `warning`, `none`) | `error` |
+| `github-annotations` | Emit GitHub Actions inline annotations (`::error`, `::warning`) | `true` |
+| `offline` | Disable remote vulnerability queries (airgapped mode) | `false` |
+| `baseline` | Path to baseline snapshot to ignore existing findings | `""` |
+| `args` | Additional CLI arguments to pass to `qv scan` | `""` |
+
+### Action Outputs
+
+| Output | Description |
+|---|---|
+| `sarif-file` | Path to the generated SARIF file |
+| `findings` | Total number of diagnostic findings detected |
+| `errors` | Total number of error findings detected |
+| `warnings` | Total number of warning findings detected |
+| `exit-code` | Exit code returned by `qv` |
 
 ---
 

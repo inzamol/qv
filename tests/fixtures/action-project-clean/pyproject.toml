@@ -1,0 +1,7 @@
+[project]
+name = "action-test-clean"
+version = "0.1.0"
+description = "Clean fixture project for action testing"
+dependencies = [
+    "click>=8.1.0",
+]
