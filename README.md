@@ -323,7 +323,7 @@ Run `qv inspect` (or `qv ui`) for a full terminal dashboard:
 
 | Category | Rule IDs | Focus Area | Default Severity |
 |---|---|---|---|
-| **Dependencies** | `DEP-001` - `DEP-006` | Constraint conflicts, undeclared imports, unused dependencies, Python version mismatches, security vulnerabilities | `ERROR` / `WARNING` |
+| **Dependencies** | `DEP-001` - `DEP-007` | Constraint conflicts, undeclared imports, unused dependencies, Python version mismatches, security vulnerabilities | `ERROR` / `WARNING` |
 | **Environment** | `ENV-001` - `ENV-003` | Active interpreter drift, Dockerfile base image mismatches, CI matrix drift | `WARNING` |
 | **Architecture** | `IMP-001` - `IMP-004`<br/>`ARC-001` - `ARC-002` | Circular imports, layer violations, component cycles, orphan modules, stdlib deprecations | `ERROR` / `WARNING` |
 | **Packaging** | `PKG-001` - `PKG-002` | Missing PEP 621 metadata, invalid configuration syntax | `ERROR` / `WARNING` |
@@ -390,7 +390,7 @@ Package Manager: uv
 │   $ uv add httpx                                                             │
 └──────────────────────────────────────────────────────────────────────────────┘
 
-┌────────────────── [WARN] DEP-002 Undeclared transitive dependency: kombu ────┐
+┌────────────────── [WARN] DEP-007 Undeclared transitive dependency: kombu ────┐
 │ Module 'kombu' is imported in src/tasks.py:3 and provided transitively        │
 │ by 'celery', but is not declared directly in project dependencies.           │
 │                                                                              │
@@ -698,7 +698,8 @@ min_severity = "warning" # Minimum threshold: "error", "warning", or "info"
 
 # Method 1: Turn off specific rules or override severity ("off", "error", "warning", "info")
 [tool.qv.rules]
-DEP-002 = "off"          # Disable missing/transitive dependency check
+DEP-002 = "off"          # Disable missing dependency check
+DEP-007 = "off"          # Disable undeclared transitive dependency check
 IMP-003 = "off"          # Disable orphan module check
 DEP-001 = "error"        # Treat dependency conflicts as blocking errors
 ENV-002 = "info"         # Demote Docker runtime drift to informational notice

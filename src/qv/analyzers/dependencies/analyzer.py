@@ -1,4 +1,4 @@
-"""Dependency analyzer implementing DEP-001, DEP-002, DEP-003, DEP-004, DEP-005."""
+"""Dependency analyzer implementing DEP-001, DEP-002, DEP-003, DEP-004, DEP-005, DEP-007."""
 
 from __future__ import annotations
 
@@ -210,6 +210,7 @@ class DependencyAnalyzer:
         "DEP-003",
         "DEP-004",
         "DEP-005",
+        "DEP-007",
     )
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
@@ -291,10 +292,11 @@ class DependencyAnalyzer:
         return diagnostics
 
     def _check_missing_dependencies(self, context: ProjectContext) -> list[Diagnostic]:
-        """DEP-002: Check for imported packages not declared in dependencies."""
+        """DEP-002 & DEP-007: Check for imported packages not declared in dependencies."""
         diagnostics: list[Diagnostic] = []
-        rule = get_rule_definition("DEP-002")
-        if not rule:
+        rule_missing = get_rule_definition("DEP-002")
+        rule_transitive = get_rule_definition("DEP-007")
+        if not rule_missing and not rule_transitive:
             return diagnostics
 
         declared_canonical_names = {
@@ -406,14 +408,18 @@ class DependencyAnalyzer:
                 )
 
                 if transitive_provider:
-                    diag_severity = Severity.WARNING
+                    rule = rule_transitive
+                    diag_id = "DEP-007"
+                    diag_severity = rule.default_severity if rule else Severity.WARNING
                     diag_title = f"Undeclared transitive dependency: {top_level}"
                     diag_msg = (
                         f"Module '{top_level}' is imported in {rel_path}:{imp.line_number} and provided "
                         f"transitively by '{transitive_provider}', but is not declared directly in project dependencies."
                     )
                 else:
-                    diag_severity = Severity.ERROR
+                    rule = rule_missing
+                    diag_id = "DEP-002"
+                    diag_severity = rule.default_severity if rule else Severity.ERROR
                     diag_title = f"Missing dependency: {top_level}"
                     diag_msg = f"Module '{top_level}' is imported in {rel_path}:{imp.line_number} but is not declared in project dependencies."
 
@@ -425,9 +431,9 @@ class DependencyAnalyzer:
                     add_args = ["install", top_level]
 
                 diag = Diagnostic(
-                    id=rule.id,
+                    id=diag_id,
                     severity=diag_severity,
-                    category=rule.category,
+                    category=rule.category if rule else "dependency",
                     title=diag_title,
                     message=diag_msg,
                     evidence=evidence_list,
@@ -442,7 +448,7 @@ class DependencyAnalyzer:
                     affected_packages=[top_level],
                     file=str(rel_path),
                     line=imp.line_number,
-                    doc_url=rule.doc_url,
+                    doc_url=rule.doc_url if rule else None,
                 )
                 diagnostics.append(diag)
 

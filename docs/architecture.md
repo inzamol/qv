@@ -193,7 +193,7 @@ src/qv/
 │   ├── models.py              # Diagnostic, Severity, ScanResult dataclasses
 │   └── rules.py               # RuleCatalog registry
 ├── analyzers/
-│   ├── dependencies/          # DEP-001 through DEP-006 analyzers
+│   ├── dependencies/          # DEP-001 through DEP-007 analyzers
 │   ├── environment/           # ENV-001 through ENV-003 analyzers
 │   ├── imports/               # IMP-001 through IMP-004 analyzers
 │   └── packaging/             # PKG-001 and PKG-002 analyzers

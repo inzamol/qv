@@ -200,6 +200,8 @@ class DoctorReporter:
             # Format a concise title
             if diag.affected_packages and ("missing" in diag.title.lower() or diag.id == "DEP-002"):
                 title = f"Missing dependency: {', '.join(diag.affected_packages)}"
+            elif diag.affected_packages and diag.id == "DEP-007":
+                title = f"Undeclared transitive dependency: {', '.join(diag.affected_packages)}"
             elif diag.affected_packages and "conflict" in diag.title.lower():
                 title = f"Version conflict: {', '.join(diag.affected_packages)}"
             elif diag.id == "ENV-001":

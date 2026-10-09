@@ -217,14 +217,14 @@ def test_reported_check_counts_across_multiple_analyzers(tmp_path: Path):
     pkg_res = pkg_engine.run(context)
     assert pkg_res.summary.checks_passed == 2
 
-    # DependencyAnalyzer (DEP-001, DEP-002, DEP-003, DEP-004, DEP-005) = 5 rules
-    # Both analyzers together = 7 rules
+    # DependencyAnalyzer (DEP-001, DEP-002, DEP-003, DEP-004, DEP-005, DEP-007) = 6 rules
+    # Both analyzers together = 8 rules
     combined_engine = AnalysisEngine(
         config=QvConfig(),
         analyzers=[PackagingAnalyzer(), DependencyAnalyzer()],
     )
     combined_res = combined_engine.run(context)
-    assert combined_res.summary.checks_passed == 7
+    assert combined_res.summary.checks_passed == 8
 
 
 def test_reported_check_counts_with_unknown_status_analyzer(tmp_path: Path):

@@ -289,3 +289,147 @@ def test_dep_004_python_compatibility_mismatch(tmp_path: Path):
     assert compat_diags[0].severity == Severity.WARNING
     assert "modern-pkg" in compat_diags[0].title
     assert ">=3.10" in compat_diags[0].message
+
+
+def test_dep_007_undeclared_transitive_dependency(tmp_path: Path):
+    """Test that importing a package provided transitively by a declared dependency emits DEP-007 (not DEP-002)."""
+    runtime = PythonRuntime("3.12.0", 3, 12, 0)
+    manifest = tmp_path / "pyproject.toml"
+    tasks_file = tmp_path / "tasks.py"
+
+    context = ProjectContext(
+        project_root=tmp_path,
+        project_name="celery-app",
+        python_runtime=runtime,
+        package_manager="uv",
+        manifest_files=(manifest,),
+        lock_files=(),
+        dependencies=(
+            DependencyDeclaration(
+                name="celery",
+                specifier=">=5.3.0",
+                source_file=manifest,
+            ),
+        ),
+        installed_packages={
+            "celery": InstalledDistribution(
+                name="celery",
+                version="5.3.6",
+                requires=("kombu<6.0,>=5.3.4",),
+            ),
+            "kombu": InstalledDistribution(
+                name="kombu",
+                version="5.3.5",
+                requires=(),
+            ),
+        },
+        source_files=(
+            SourceFile(
+                path=tasks_file,
+                relative_path=Path("tasks.py"),
+                content="import kombu\n",
+                module_name="tasks",
+            ),
+        ),
+        imports=(
+            ImportRecord(
+                module_name="kombu",
+                source_file=tasks_file,
+                line_number=1,
+                is_relative=False,
+            ),
+        ),
+        docker=DockerConfig(has_dockerfile=False),
+        ci=CIConfig(has_ci=False),
+    )
+
+    analyzer = DependencyAnalyzer()
+    diagnostics = analyzer.analyze(context)
+
+    # Must emit DEP-007 with WARNING severity
+    dep_007 = [d for d in diagnostics if d.id == "DEP-007"]
+    assert len(dep_007) == 1
+    assert dep_007[0].severity == Severity.WARNING
+    assert dep_007[0].title == "Undeclared transitive dependency: kombu"
+    assert "celery" in dep_007[0].message
+    assert any(e.source and "celery metadata" in e.source for e in dep_007[0].evidence)
+
+    # Must NOT emit DEP-002 for kombu
+    dep_002 = [d for d in diagnostics if d.id == "DEP-002"]
+    assert len(dep_002) == 0
+
+
+def test_dep_002_and_dep_007_independent_suppression(tmp_path: Path):
+    """Test that DEP-002 and DEP-007 can be configured/suppressed independently."""
+    from qv.core.config import QvConfig
+    from qv.core.engine import AnalysisEngine
+
+    runtime = PythonRuntime("3.12.0", 3, 12, 0)
+    manifest = tmp_path / "pyproject.toml"
+    app_file = tmp_path / "app.py"
+
+    context = ProjectContext(
+        project_root=tmp_path,
+        project_name="mixed-deps-app",
+        python_runtime=runtime,
+        package_manager="uv",
+        manifest_files=(manifest,),
+        lock_files=(),
+        dependencies=(
+            DependencyDeclaration(
+                name="celery",
+                specifier=">=5.3.0",
+                source_file=manifest,
+            ),
+        ),
+        installed_packages={
+            "celery": InstalledDistribution(
+                name="celery",
+                version="5.3.6",
+                requires=("kombu<6.0,>=5.3.4",),
+            ),
+            "kombu": InstalledDistribution(
+                name="kombu",
+                version="5.3.5",
+                requires=(),
+            ),
+        },
+        source_files=(
+            SourceFile(
+                path=app_file,
+                relative_path=Path("app.py"),
+                content="import kombu\nimport requests\n",
+                module_name="app",
+            ),
+        ),
+        imports=(
+            ImportRecord(
+                module_name="kombu",
+                source_file=app_file,
+                line_number=1,
+                is_relative=False,
+            ),
+            ImportRecord(
+                module_name="requests",
+                source_file=app_file,
+                line_number=2,
+                is_relative=False,
+            ),
+        ),
+        docker=DockerConfig(has_dockerfile=False),
+        ci=CIConfig(has_ci=False),
+    )
+
+    # Suppress only DEP-007: DEP-002 must still be emitted
+    config_ignore_007 = QvConfig(ignored_rules={"DEP-007"})
+    res_007_ignored = AnalysisEngine(config=config_ignore_007).run(context)
+    rule_ids_1 = [d.id for d in res_007_ignored.diagnostics]
+    assert "DEP-002" in rule_ids_1
+    assert "DEP-007" not in rule_ids_1
+
+    # Suppress only DEP-002: DEP-007 must still be emitted
+    config_ignore_002 = QvConfig(ignored_rules={"DEP-002"})
+    res_002_ignored = AnalysisEngine(config=config_ignore_002).run(context)
+    rule_ids_2 = [d.id for d in res_002_ignored.diagnostics]
+    assert "DEP-007" in rule_ids_2
+    assert "DEP-002" not in rule_ids_2

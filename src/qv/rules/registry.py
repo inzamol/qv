@@ -85,6 +85,15 @@ RULES_CATALOG: dict[str, RuleDefinition] = {
         remediation_hint="Update the vulnerable dependency or apply vendor security patches.",
         doc_url=make_doc_url("16-dep-006-vulnerable-transitive-dependency"),
     ),
+    "DEP-007": RuleDefinition(
+        id="DEP-007",
+        category="dependency",
+        title="Undeclared transitive dependency",
+        description="A package is imported in source code and provided transitively by a dependency, but is not declared directly in project dependencies.",
+        default_severity=Severity.WARNING,
+        remediation_hint="Add the transitive dependency directly to your pyproject.toml or requirements.txt.",
+        doc_url=make_doc_url("17-dep-007-undeclared-transitive-dependency"),
+    ),
     # Security rules
     "SEC-001": RuleDefinition(
         id="SEC-001",

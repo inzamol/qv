@@ -253,6 +253,11 @@ class DependencyRiskGraph:
                     _update_risk(
                         RiskLevel.MEDIUM, "Imported in code but missing from pyproject.toml"
                     )
+                elif diag.id == "DEP-007":
+                    _update_risk(
+                        RiskLevel.MEDIUM,
+                        "Imported in code and provided transitively, but not declared directly",
+                    )
                 elif diag.id == "DEP-004":
                     _update_risk(RiskLevel.MEDIUM, "Python runtime compatibility mismatch")
                 elif diag.id == "DEP-003":

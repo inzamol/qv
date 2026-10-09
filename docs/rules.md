@@ -36,6 +36,12 @@
 - **Description:** A security vulnerability has been identified in a direct or transitive dependency.
 - **Remediation:** Update the vulnerable dependency or apply vendor security patches.
 
+### 1.7 DEP-007: Undeclared Transitive Dependency
+- **Default Severity:** `WARNING`
+- **Description:** A package is imported in source code and provided transitively by a dependency, but is not declared directly in project dependencies.
+- **Remediation:** Add the transitive dependency directly to your pyproject.toml or requirements.txt.
+
+
 ---
 
 ## 2. Security Rules (`SEC-xxx`)
