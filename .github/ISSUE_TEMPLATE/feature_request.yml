@@ -1,19 +1,37 @@
-name: 💡 Feature Request
-description: Suggest a new capability, visualizer, reporter, or CLI option for qv.
+name: "Feature Request"
+description: Propose a capability, analyzer, reporter, or workflow improvement for QV.
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Have an idea to make `qv` better? Tell us about your proposal!
+        Help us understand the problem before deciding on a solution.
+        Search existing issues and explain why current workflows are insufficient.
 
   - type: textarea
     id: problem
     attributes:
-      label: Problem / Motivation
-      description: Is your feature request related to a specific pain point or workflow limitation?
-      placeholder: I'm always frustrated when...
+      label: Problem and Motivation
+      description: What problem are you trying to solve?
+      placeholder: |
+        When analyzing a large Python repository, I cannot easily
+        identify which newly introduced findings should block a pull request.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target_user
+    attributes:
+      label: Primary User or Workflow
+      options:
+        - Individual developer
+        - Python library maintainer
+        - Application development team
+        - Platform / DevOps team
+        - CI/CD pipeline
+        - Security or compliance team
+        - Other
     validations:
       required: true
 
@@ -21,23 +39,63 @@ body:
     id: proposed_solution
     attributes:
       label: Proposed Solution
-      description: Describe the solution or new command/flag you'd like to see.
-      placeholder: Add a `--watch` flag to `qv scan` that...
+      description: Describe the expected capability without unnecessarily restricting implementation choices.
+      placeholder: |
+        Add a mode that compares current findings against a baseline
+        and reports newly introduced issues in pull requests.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: List observable conditions that demonstrate the feature works correctly.
+      placeholder: |
+        - Existing baseline findings are not reported as new.
+        - Newly introduced findings are reported.
+        - JSON output remains valid.
+        - Exit codes follow the documented CLI contract.
+        - Existing commands continue to work.
     validations:
       required: true
 
   - type: textarea
     id: alternatives
     attributes:
-      label: Considered Alternatives
-      description: Describe any alternative solutions or workarounds you've evaluated.
+      label: Existing Functionality and Alternatives
+      description: Explain current workarounds or tools considered.
+      placeholder: |
+        Currently I run a full scan and manually compare reports.
+        This is difficult to maintain across branches.
+    validations:
+      required: false
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and Migration Impact
+      description: Could this change affect existing commands, configuration, output schemas, or CI workflows?
+      placeholder: |
+        The feature should be opt-in initially and preserve
+        existing exit-code and output behavior.
+    validations:
+      required: false
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and Trade-offs
+      description: Mention relevant performance, offline, privacy, dependency, or platform requirements.
+      placeholder: |
+        Must work offline and avoid adding runtime dependencies.
     validations:
       required: false
 
   - type: checkboxes
-    id: willingness
+    id: contribution
     attributes:
       label: Contribution
       options:
-        - label: I would be interested in submitting a Pull Request to implement this.
+        - label: I would be interested in submitting a pull request.
           required: false

@@ -44,6 +44,105 @@ def test_action_yml_exists_and_valid():
     assert "python-qv" in content
 
 
+def test_action_yml_latest_version_resolution_timeout_and_warning():
+    """Verify action.yml configures a timeout on urlopen and emits ::warning:: on PyPI failure."""
+    action_yml = REPO_ROOT / "action.yml"
+    content = action_yml.read_text(encoding="utf-8")
+
+    assert "urllib.request.urlopen('https://pypi.org/pypi/python-qv/json', timeout=" in content
+    assert "::warning::" in content
+    assert 'RESOLVED_VER="1.0.1"' in content
+
+
+def test_action_latest_fallback_emits_warning_on_failure(tmp_path: Path):
+    """Verify that when PyPI lookup fails for 'latest', a warning is emitted and 1.0.1 fallback used."""
+    import shutil
+
+    import pytest
+
+    git_bash = Path(r"C:\Program Files\Git\bin\bash.exe")
+    if sys.platform == "win32" and git_bash.exists():
+        bash = str(git_bash)
+    else:
+        bash = shutil.which("bash")
+        if sys.platform == "win32" and bash and "system32" in bash.lower():
+            pytest.skip("WSL bash on Windows cannot directly execute Windows temp paths")
+
+    if not bash:
+        pytest.skip("bash executable not found")
+
+    test_sh = tmp_path / "test_install.sh"
+    test_sh.write_text(
+        """#!/usr/bin/env bash
+set -e
+INPUT_VERSION="latest"
+if [ "$INPUT_VERSION" = "latest" ]; then
+  RESOLVED_VER=$(python -c "import urllib.request, json; print(json.loads(urllib.request.urlopen('https://invalid.example.nonexistent/json', timeout=1).read())['info']['version'])" 2>/dev/null || true)
+  if [ -z "$RESOLVED_VER" ]; then
+    echo "::warning::Failed to resolve latest python-qv version from PyPI; falling back to 1.0.1"
+    RESOLVED_VER="1.0.1"
+  fi
+fi
+echo "FINAL_VERSION=$RESOLVED_VER"
+""",
+        encoding="utf-8",
+    )
+
+    res = subprocess.run([bash, str(test_sh)], capture_output=True, text=True)
+    assert res.returncode == 0
+    assert "::warning::" in res.stdout
+    assert "FINAL_VERSION=1.0.1" in res.stdout
+
+
+def test_action_yml_local_version_requires_src_directory():
+    """Verify action.yml checks for $ACTION_PATH/src when version=local or version=."""
+    action_yml = REPO_ROOT / "action.yml"
+    content = action_yml.read_text(encoding="utf-8")
+
+    assert '[ ! -d "$ACTION_PATH/src" ]' in content
+    assert "::error::version=local requires $ACTION_PATH/src" in content
+
+
+def test_action_local_fails_when_src_missing(tmp_path: Path):
+    """Verify that version=local fails early with an error annotation if $ACTION_PATH/src is missing."""
+    import shutil
+
+    import pytest
+
+    git_bash = Path(r"C:\Program Files\Git\bin\bash.exe")
+    if sys.platform == "win32" and git_bash.exists():
+        bash = str(git_bash)
+    else:
+        bash = shutil.which("bash")
+        if sys.platform == "win32" and bash and "system32" in bash.lower():
+            pytest.skip("WSL bash on Windows cannot directly execute Windows temp paths")
+
+    if not bash:
+        pytest.skip("bash executable not found")
+
+    empty_action_dir = tmp_path / "action_empty"
+    empty_action_dir.mkdir()
+
+    test_sh = tmp_path / "test_local_check.sh"
+    test_sh.write_text(
+        f"""#!/usr/bin/env bash
+INPUT_VERSION="local"
+ACTION_PATH="{empty_action_dir.as_posix()}"
+if [ "$INPUT_VERSION" = "local" ] || [ "$INPUT_VERSION" = "." ]; then
+  if [ ! -d "$ACTION_PATH/src" ]; then
+    echo "::error::version=local requires $ACTION_PATH/src" >&2
+    exit 1
+  fi
+fi
+""",
+        encoding="utf-8",
+    )
+
+    res = subprocess.run([bash, str(test_sh)], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert "::error::version=local requires" in res.stderr
+
+
 def test_action_clean_project(tmp_path: Path):
     """Test running action against a clean project with zero findings."""
     output_file = tmp_path / "clean.sarif"

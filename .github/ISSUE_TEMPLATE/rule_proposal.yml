@@ -1,56 +1,206 @@
-name: 📋 New Diagnostic Rule Proposal
-description: Propose a new diagnostic check, code smell detection, or ecosystem drift rule.
+name: "New Diagnostic Rule Proposal"
+description: Propose a deterministic, evidence-backed diagnostic rule for QV.
 title: "[Rule Proposal]: "
 labels: ["rules", "enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Diagnostic rules in `qv` detect real ecosystem friction, configuration bugs, or runtime hazards.
+        QV rules should identify real defects, ecosystem incompatibilities,
+        configuration problems, or actionable risks.
+
+        A production rule must have a clear evidence source, positive and
+        negative test cases, documented limitations, and an actionable
+        remediation strategy.
+
+        Do not include secrets, private source code, or credentials.
 
   - type: input
     id: suggested_rule_id
     attributes:
-      label: Proposed Rule Category & ID
-      description: e.g. `DEP-xxx` (Dependencies), `ENV-xxx` (Environment), `IMP-xxx` (Imports), `PKG-xxx` (Packaging)
-      placeholder: DEP-007
+      label: Proposed Rule ID
+      description: Suggest a category and ID. Maintainers will confirm uniqueness and naming.
+      placeholder: "DEP-007"
     validations:
       required: true
 
   - type: textarea
     id: summary
     attributes:
-      label: Rule Summary & Objective
-      description: What specific condition or bug does this rule identify?
-      placeholder: Detect when a requirement in pyproject.toml has an unpinned upper bound...
+      label: Rule Summary and Objective
+      description: Describe the exact condition the rule should detect and why it matters.
+      placeholder: |
+        Detect a dependency declared in project metadata that is
+        demonstrably incompatible with the project's supported Python version.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_evidence
+    attributes:
+      label: Problem Evidence
+      description: Provide a reproducible example, real-world incident, or authoritative documentation.
+      placeholder: |
+        Relevant configuration:
+        # Minimal pyproject.toml excerpt
+
+        Observed behavior:
+        # Explain the failure or risk
+
+        Evidence source:
+        # Reproduction, official documentation, or other reference
     validations:
       required: true
 
   - type: dropdown
     id: severity
     attributes:
-      label: Default Severity
+      label: Proposed Default Severity
+      description: Severity describes potential impact, not certainty.
       options:
-        - ERROR (Blocking hazard or broken project)
-        - WARNING (Sub-optimal or risky configuration)
-        - INFO (Advisory metric)
+        - "ERROR - Demonstrated defect or serious hazard"
+        - "WARNING - Risky or potentially problematic condition"
+        - "INFO - Advisory observation"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: confidence
+    attributes:
+      label: Expected Detection Confidence
+      description: How strong is the evidence available to the rule?
+      options:
+        - "High - Direct, deterministic evidence"
+        - "Medium - Strong evidence with some assumptions"
+        - "Low - Heuristic requiring verification"
     validations:
       required: true
 
   - type: textarea
-    id: evidence
+    id: positive_test
+    attributes:
+      label: Positive Test Case
+      description: Provide the smallest example that must trigger the rule and the expected diagnostic.
+      placeholder: |
+        Input:
+        # Minimal problematic code or configuration
+
+        Expected rule ID: DEP-007
+        Expected severity: WARNING
+        Expected message: Explain the incompatibility
+        Why it must trigger: Explain the evidence
+    validations:
+      required: true
+
+  - type: textarea
+    id: negative_test
+    attributes:
+      label: Negative Test Case
+      description: Provide a similar valid example that must not trigger the rule.
+      placeholder: |
+        Input:
+        # Minimal valid code or configuration
+
+        Expected result:
+        No DEP-007 diagnostic
+
+        Why it must not trigger:
+        Explain why the pattern is valid.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence_sources
     attributes:
       label: Deterministic Evidence Sources
-      description: Where does the evidence come from without making external network calls?
-      placeholder: AST import nodes, pyproject.toml table parsing, etc.
+      description: Identify the exact local inputs and analysis methods needed. State any version assumptions.
+      placeholder: |
+        - pyproject.toml dependency metadata
+        - Parsed Python version constraints
+        - Local project configuration
+
+        Network access required: No
+        Relevant version assumptions: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: false_positives
+    attributes:
+      label: Known False Positives and Limitations
+      description: Identify valid patterns that could resemble the problematic condition.
+      placeholder: |
+        - Optional dependencies used only by an extra
+        - Dependencies loaded through plugin entry points
+        - Environment-specific configuration
+        - Cases the rule cannot reliably determine
+    validations:
+      required: true
+
+  - type: textarea
+    id: severity_rationale
+    attributes:
+      label: Severity and Confidence Rationale
+      description: Explain the impact and the strength of evidence separately.
+      placeholder: |
+        Impact: ...
+        Evidence strength: ...
+        Why this severity is appropriate: ...
+        Why this confidence level is appropriate: ...
     validations:
       required: true
 
   - type: textarea
     id: remediation
     attributes:
-      label: Remediation Strategy & Fix
-      description: What actionable command or edit will resolve the issue?
-      placeholder: Run `uv add ...` or update the manifest table.
+      label: Remediation Strategy
+      description: Describe the manual correction or proposed automated fix and how success can be verified.
+      placeholder: |
+        Recommended correction: ...
+        Automated fix possible: Yes / No
+        Files affected: ...
+        Validation: ...
+        Potential risks: ...
     validations:
       required: true
+
+  - type: textarea
+    id: overlap
+    attributes:
+      label: Existing Rule Overlap
+      description: Identify related QV rules and explain why a new rule is necessary.
+      placeholder: |
+        Related rules: ...
+        Why extending an existing rule is insufficient: ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: performance
+    attributes:
+      label: Performance Considerations
+      description: Explain expected analysis cost and any expensive operations.
+      placeholder: |
+        Expected analysis: local AST and metadata inspection
+        Potential expensive operations: ...
+        Expected impact on large repositories: ...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: rule_checklist
+    attributes:
+      label: Rule Quality Checklist
+      options:
+        - label: I searched existing rules and proposals for duplicates.
+          required: true
+        - label: I supplied a positive test case.
+          required: true
+        - label: I supplied a negative test case.
+          required: true
+        - label: I documented the evidence source and known limitations.
+          required: true
+        - label: I considered false positives and severity separately.
+          required: true
+        - label: I described an actionable remediation strategy.
+          required: true

@@ -673,3 +673,71 @@ dependencies = [
     assert '"amqp"' in updated_toml
     assert "Skipped 1 action(s)" in result.output
     assert "requires review" in result.output
+
+
+def test_remediation_rejects_project_root_itself(tmp_path: Path):
+    """Ensure project root directory itself is rejected as a target file."""
+    import pytest
+
+    engine = RemediationEngine(project_root=tmp_path)
+    with pytest.raises(ValueError, match="cannot be the project root directory itself"):
+        engine._validate_target_path(".")
+
+    with pytest.raises(ValueError, match="cannot be the project root directory itself"):
+        engine._validate_target_path(str(tmp_path))
+
+
+def test_all_file_remediation_methods_reject_external_paths(tmp_path: Path):
+    """Ensure all file-modifying methods reject external paths and directory traversal (S2083)."""
+    import pytest
+
+    engine = RemediationEngine(project_root=tmp_path)
+    bad_target = "../outside_manifest.toml"
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._add_dependency_to_pyproject("httpx", target_file=bad_target)
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._remove_dependency_from_pyproject("httpx", target_file=bad_target)
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._add_dependency_to_requirements("httpx", target_file=bad_target)
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._remove_dependency_from_requirements("httpx", target_file=bad_target)
+
+    with pytest.raises(ValueError, match="resolves outside project root"):
+        engine._initialize_pyproject_metadata("myproject", target_file=bad_target)
+
+
+def test_plan_fixes_rejects_traversal_in_diag_file(tmp_path: Path):
+    """Ensure plan_fixes ignores diag.file paths that attempt directory traversal."""
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        "[project]\nname='test'\nversion='0.1.0'\ndependencies=['unused']\n", encoding="utf-8"
+    )
+
+    engine = RemediationEngine(project_root=tmp_path)
+    scan_result = ScanResult(
+        project_name="demo",
+        project_path=str(tmp_path),
+        python_version="3.12.0",
+        package_manager="uv",
+        summary=ScanSummary(warnings_count=1),
+        diagnostics=[
+            Diagnostic(
+                id="DEP-003",
+                severity=Severity.WARNING,
+                category="dependency",
+                title="Unused dependency",
+                message="Package unused is unused",
+                affected_packages=["unused"],
+                file="../../outside_deps.txt",
+            )
+        ],
+    )
+
+    plan = engine.plan_fixes(scan_result)
+    assert len(plan.actions) == 1
+    # Must fallback to pyproject.toml within root, not the traversed relative file
+    assert plan.actions[0].target_file == "pyproject.toml"

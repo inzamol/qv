@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 📖 Documentation
+  - name: Documentation
     url: https://qv.readthedocs.io/
     about: Read the official documentation and guides.
-  - name: 💬 Discussions & Questions
+  - name: Discussions & Questions
     url: https://github.com/inzamol/qv/discussions
     about: Ask questions, share ideas, and discuss with the community.

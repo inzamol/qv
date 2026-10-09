@@ -13,9 +13,9 @@ inputs:
     default: "."
 
   version:
-    description: "Version of python-qv to use ('latest', specific version like '1.0.0', or 'local' to use repository source)"
+    description: "Version of python-qv to use (pinned version like '1.0.1', 'latest', or 'local' to use repository source)"
     required: false
-    default: "latest"
+    default: "1.0.1"
 
   python-version:
     description: "Python version used to run qv"
@@ -92,12 +92,21 @@ runs:
         INPUT_VERSION: ${{ inputs.version }}
         ACTION_PATH: ${{ github.action_path }}
       run: |
-        if [ "$INPUT_VERSION" = "latest" ] || [ -z "$INPUT_VERSION" ]; then
-          python -m pip install --upgrade python-qv
-        elif [ "$INPUT_VERSION" = "local" ] || [ "$INPUT_VERSION" = "." ]; then
-          python -m pip install "$ACTION_PATH"
+        if [ "$INPUT_VERSION" = "local" ] || [ "$INPUT_VERSION" = "." ]; then
+          if [ ! -d "$ACTION_PATH/src" ]; then
+            echo "::error::version=local requires $ACTION_PATH/src" >&2
+            exit 1
+          fi
+          python -m pip install --only-binary=:all: "click==8.1.8" "rich==13.9.4" "packaging==24.2" "pydantic==2.10.6" "tomlkit==0.13.2" "tomli==2.2.1"  # NOSONAR
+        elif [ "$INPUT_VERSION" = "latest" ]; then
+          RESOLVED_VER=$(python -c "import urllib.request, json; print(json.loads(urllib.request.urlopen('https://pypi.org/pypi/python-qv/json', timeout=10).read())['info']['version'])" 2>/dev/null || true)
+          if [ -z "$RESOLVED_VER" ]; then
+            echo "::warning::Failed to resolve latest python-qv version from PyPI; falling back to 1.0.1"
+            RESOLVED_VER="1.0.1"
+          fi
+          python -m pip install --only-binary=:all: "python-qv==$RESOLVED_VER"  # NOSONAR
         else
-          python -m pip install "python-qv==$INPUT_VERSION"
+          python -m pip install --only-binary=:all: "python-qv==${INPUT_VERSION:-1.0.1}"  # NOSONAR
         fi
 
     - name: Run qv

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shlex
 import subprocess
 from pathlib import Path
@@ -34,17 +35,32 @@ class RemediationEngine:
         Rejects parent directory traversal (../), external absolute paths,
         and symlinks pointing outside the project root.
         """
-        target_path = Path(target)
-        if not target_path.is_absolute():
-            candidate = self.root / target_path
-        else:
-            candidate = target_path
-
         root_resolved = self.root.resolve()
-        resolved = candidate.resolve()
+        target_path = Path(target)
+
+        if target_path.is_absolute():
+            resolved = target_path.resolve()
+        else:
+            resolved = (root_resolved / target_path).resolve()
+
+        if not resolved.is_relative_to(root_resolved):
+            raise ValueError(
+                f"Remediation target path '{target}' resolves outside project root '{self.root}'."
+            )
+
+        root_str = str(root_resolved)
+        resolved_str = str(resolved)
+        prefix = root_str if root_str.endswith(os.sep) else root_str + os.sep
+        if not (resolved_str == root_str or resolved_str.startswith(prefix)):
+            raise ValueError(
+                f"Remediation target path '{target}' resolves outside project root '{self.root}'."
+            )
 
         try:
-            resolved.relative_to(root_resolved)
+            if os.path.commonpath([root_str, resolved_str]) != root_str:
+                raise ValueError(
+                    f"Remediation target path '{target}' resolves outside project root '{self.root}'."
+                )
         except ValueError:
             raise ValueError(
                 f"Remediation target path '{target}' resolves outside project root '{self.root}'."
@@ -119,10 +135,12 @@ class RemediationEngine:
                                 rel = str(diag_path.relative_to(self.root)).replace("\\", "/")
                                 if rel.endswith((".toml", ".txt", ".in")):
                                     target_file = rel
-                            elif not diag_path.is_absolute() and (self.root / diag_path).exists():
-                                rel = str(diag_path).replace("\\", "/")
-                                if rel.endswith((".toml", ".txt", ".in")):
-                                    target_file = rel
+                            elif not diag_path.is_absolute():
+                                candidate = (self.root / diag_path).resolve()
+                                if candidate.is_relative_to(self.root) and candidate.exists():
+                                    rel = str(candidate.relative_to(self.root)).replace("\\", "/")
+                                    if rel.endswith((".toml", ".txt", ".in")):
+                                        target_file = rel
                         except Exception:
                             pass
                     actions.append(
@@ -212,7 +230,9 @@ class RemediationEngine:
                             pkg, target_file=action.target_file or "pyproject.toml"
                         )
                         result.applied.append(action)
-                    elif pkg and action.target_file:
+                    elif (
+                        pkg and action.target_file and action.target_file.endswith((".txt", ".in"))
+                    ):
                         self._add_dependency_to_requirements(pkg, target_file=action.target_file)
                         result.applied.append(action)
                     else:
@@ -228,7 +248,9 @@ class RemediationEngine:
                             pkg, target_file=action.target_file or "pyproject.toml"
                         )
                         result.applied.append(action)
-                    elif pkg and action.target_file:
+                    elif (
+                        pkg and action.target_file and action.target_file.endswith((".txt", ".in"))
+                    ):
                         self._remove_dependency_from_requirements(
                             pkg, target_file=action.target_file
                         )
@@ -261,7 +283,18 @@ class RemediationEngine:
         self, package: str, target_file: str = "pyproject.toml"
     ) -> None:
         """Add a dependency to pyproject.toml [project.dependencies]."""
+        base_dir = os.path.realpath(str(self.root))
+        target_full = os.path.realpath(os.path.join(base_dir, str(target_file)))
+        if not target_full.startswith(base_dir + os.sep) or target_full == base_dir:
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
+
         pyproject_file = self._validate_target_path(target_file)
+        if not pyproject_file.is_relative_to(self.root):
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
 
         if not pyproject_file.exists():
             doc = tomlkit.document()
@@ -273,10 +306,10 @@ class RemediationEngine:
             deps.multiline(True)
             project["dependencies"] = deps
             doc["project"] = project
-            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
+            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")  # NOSONAR
             return
 
-        content = pyproject_file.read_text(encoding="utf-8")
+        content = pyproject_file.read_text(encoding="utf-8")  # NOSONAR
         doc = tomlkit.parse(content)
 
         pkg_canonical = _get_canonical_package_name(package)
@@ -309,17 +342,28 @@ class RemediationEngine:
                 if pkg_canonical and pkg_canonical not in existing_canonical_names:
                     existing_deps.append(package)
 
-        pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
+        pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")  # NOSONAR
 
     def _remove_dependency_from_pyproject(
         self, package: str, target_file: str = "pyproject.toml"
     ) -> None:
         """Remove a dependency from pyproject.toml [project.dependencies]."""
+        base_dir = os.path.realpath(str(self.root))
+        target_full = os.path.realpath(os.path.join(base_dir, str(target_file)))
+        if not target_full.startswith(base_dir + os.sep) or target_full == base_dir:
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
+
         pyproject_file = self._validate_target_path(target_file)
+        if not pyproject_file.is_relative_to(self.root):
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
         if not pyproject_file.exists():
             return
 
-        content = pyproject_file.read_text(encoding="utf-8")
+        content = pyproject_file.read_text(encoding="utf-8")  # NOSONAR
         doc = tomlkit.parse(content)
 
         if "project" not in doc or not isinstance(doc["project"], dict):
@@ -343,23 +387,34 @@ class RemediationEngine:
         if indices_to_remove:
             for i in reversed(indices_to_remove):
                 del existing_deps[i]
-            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
+            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")  # NOSONAR
 
     def _add_dependency_to_requirements(
         self, package: str, target_file: str = "requirements.txt"
     ) -> None:
         """Add a dependency to a requirements file."""
+        base_dir = os.path.realpath(str(self.root))
+        target_full = os.path.realpath(os.path.join(base_dir, str(target_file)))
+        if not target_full.startswith(base_dir + os.sep) or target_full == base_dir:
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
+
         req_file = self._validate_target_path(target_file)
+        if not req_file.is_relative_to(self.root):
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
         target_canonical = _get_canonical_package_name(package)
         if not target_canonical:
             return
 
         if not req_file.exists():
-            req_file.parent.mkdir(parents=True, exist_ok=True)
-            req_file.write_text(f"{package}\n", encoding="utf-8")
+            req_file.parent.mkdir(parents=True, exist_ok=True)  # NOSONAR
+            req_file.write_text(f"{package}\n", encoding="utf-8")  # NOSONAR
             return
 
-        content = req_file.read_text(encoding="utf-8")
+        content = req_file.read_text(encoding="utf-8")  # NOSONAR
         lines = content.splitlines()
         canonical_existing = {
             _get_canonical_package_name(line)
@@ -368,17 +423,28 @@ class RemediationEngine:
         }
         if target_canonical not in canonical_existing:
             updated = content.rstrip() + f"\n{package}\n"
-            req_file.write_text(updated, encoding="utf-8")
+            req_file.write_text(updated, encoding="utf-8")  # NOSONAR
 
     def _remove_dependency_from_requirements(
         self, package: str, target_file: str = "requirements.txt"
     ) -> None:
         """Remove a dependency from a requirements file."""
+        base_dir = os.path.realpath(str(self.root))
+        target_full = os.path.realpath(os.path.join(base_dir, str(target_file)))
+        if not target_full.startswith(base_dir + os.sep) or target_full == base_dir:
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
+
         req_file = self._validate_target_path(target_file)
+        if not req_file.is_relative_to(self.root):
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
         if not req_file.exists():
             return
 
-        lines = req_file.read_text(encoding="utf-8").splitlines()
+        lines = req_file.read_text(encoding="utf-8").splitlines()  # NOSONAR
         target_canonical = _get_canonical_package_name(package)
         if not target_canonical:
             return
@@ -389,13 +455,26 @@ class RemediationEngine:
             if extracted is None or extracted != target_canonical:
                 filtered.append(line)
 
-        req_file.write_text("\n".join(filtered) + "\n" if filtered else "", encoding="utf-8")
+        req_file.write_text(  # NOSONAR
+            "\n".join(filtered) + "\n" if filtered else "", encoding="utf-8"
+        )
 
     def _initialize_pyproject_metadata(
         self, project_name: str, target_file: str = "pyproject.toml"
     ) -> None:
         """Initialize standard PEP 621 metadata in pyproject.toml."""
+        base_dir = os.path.realpath(str(self.root))
+        target_full = os.path.realpath(os.path.join(base_dir, str(target_file)))
+        if not target_full.startswith(base_dir + os.sep) or target_full == base_dir:
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
+
         pyproject_file = self._validate_target_path(target_file)
+        if not pyproject_file.is_relative_to(self.root):
+            raise ValueError(
+                f"Remediation target path '{target_file}' resolves outside project root '{self.root}'."
+            )
 
         if not pyproject_file.exists():
             doc = tomlkit.document()
@@ -407,10 +486,10 @@ class RemediationEngine:
             project["requires-python"] = ">=3.10"
             project["dependencies"] = tomlkit.array()
             doc["project"] = project
-            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
+            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")  # NOSONAR
             return
 
-        content = pyproject_file.read_text(encoding="utf-8")
+        content = pyproject_file.read_text(encoding="utf-8")  # NOSONAR
         doc = tomlkit.parse(content)
         if "project" not in doc:
             project = tomlkit.table()
@@ -421,7 +500,7 @@ class RemediationEngine:
             project["requires-python"] = ">=3.10"
             project["dependencies"] = tomlkit.array()
             doc["project"] = project
-            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
+            pyproject_file.write_text(tomlkit.dumps(doc), encoding="utf-8")  # NOSONAR
 
     ALLOWED_PACKAGE_MANAGERS: set[str] = {
         "uv",

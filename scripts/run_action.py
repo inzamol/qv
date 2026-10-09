@@ -27,6 +27,13 @@ if sys.platform == "win32":
         pass
 
 
+action_path_env = os.environ.get("ACTION_PATH")
+if action_path_env:
+    src_dir = str(Path(action_path_env) / "src")
+    if Path(src_dir).is_dir() and src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+
+
 def _log_error(msg: str) -> None:
     print(f"::error::{msg}", flush=True)
     print(msg, file=sys.stderr, flush=True)
@@ -168,7 +175,15 @@ def main() -> int:
             pass
 
     # 7. Execute qv CLI
-    process = subprocess.run(cmd)
+    sub_env = os.environ.copy()
+    if action_path_env:
+        src_path = str(Path(action_path_env) / "src")
+        if Path(src_path).is_dir():
+            existing_pythonpath = sub_env.get("PYTHONPATH", "")
+            sub_env["PYTHONPATH"] = (
+                f"{src_path}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else src_path
+            )
+    process = subprocess.run(cmd, env=sub_env)
     raw_exit_code = process.returncode
 
     # 8. Extract findings & metrics for outputs and summary logging
