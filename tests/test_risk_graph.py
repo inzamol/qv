@@ -288,6 +288,7 @@ def test_relative_empty_and_stdlib_imports_are_ignored(
         ("DEP-006", Severity.ERROR, RiskLevel.CRITICAL, "Vulnerability advisory"),
         ("DEP-001", Severity.ERROR, RiskLevel.HIGH, "version constraint conflict"),
         ("DEP-002", Severity.ERROR, RiskLevel.MEDIUM, "missing from pyproject.toml"),
+        ("DEP-007", Severity.WARNING, RiskLevel.MEDIUM, "provided transitively"),
         ("DEP-004", Severity.WARNING, RiskLevel.MEDIUM, "runtime compatibility mismatch"),
         ("DEP-003", Severity.WARNING, RiskLevel.LOW, "no direct import"),
         ("CUSTOM-001", Severity.ERROR, RiskLevel.HIGH, "Finding CUSTOM-001"),

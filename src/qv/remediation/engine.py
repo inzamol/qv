@@ -87,8 +87,8 @@ class RemediationEngine:
             if rule_filter and diag.id.upper() != rule_filter.upper():
                 continue
 
-            # Handle DEP-002: Missing dependency declaration
-            if diag.id == "DEP-002":
+            # Handle DEP-002: Missing dependency declaration and DEP-007: Undeclared transitive dependency
+            if diag.id in ("DEP-002", "DEP-007"):
                 pkg = diag.metadata.get("missing_package")
                 if not pkg and diag.affected_packages:
                     pkg = diag.affected_packages[0]
@@ -101,12 +101,17 @@ class RemediationEngine:
                         if requirements_path.exists()
                         else "pyproject.toml"
                     )
+                    desc = (
+                        f"Add missing dependency '{pkg}' to {target_file}"
+                        if diag.id == "DEP-002"
+                        else f"Add undeclared transitive dependency '{pkg}' to {target_file}"
+                    )
                     actions.append(
                         FixAction(
-                            id=f"fix-dep-002-{idx}-{pkg}",
-                            rule_id="DEP-002",
+                            id=f"fix-{diag.id.lower()}-{idx}-{pkg}",
+                            rule_id=diag.id,
                             action_type=FixActionType.ADD_DEPENDENCY,
-                            description=f"Add missing dependency '{pkg}' to {target_file}",
+                            description=desc,
                             target_file=target_file,
                             diff=f"+ {pkg}",
                             metadata={"package": pkg},

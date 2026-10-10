@@ -78,6 +78,53 @@ dependencies = [
     assert '"click>=8.0"' in updated
 
 
+def test_remediation_plan_and_apply_dep_007(tmp_path: Path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """[project]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+    "celery>=5.3",
+]
+""",
+        encoding="utf-8",
+    )
+
+    engine = RemediationEngine(project_root=tmp_path)
+    scan_result = ScanResult(
+        project_name="demo",
+        project_path=str(tmp_path),
+        python_version="3.12.0",
+        package_manager="uv",
+        summary=ScanSummary(warnings_count=1),
+        diagnostics=[
+            Diagnostic(
+                id="DEP-007",
+                severity=Severity.WARNING,
+                category="dependency",
+                title="Undeclared transitive dependency: kombu",
+                message="Module 'kombu' is imported and provided transitively by 'celery'",
+                affected_packages=["kombu"],
+            )
+        ],
+    )
+
+    plan = engine.plan_fixes(scan_result)
+    assert plan.total_fixes == 1
+    assert plan.actions[0].rule_id == "DEP-007"
+    assert plan.actions[0].action_type == FixActionType.ADD_DEPENDENCY
+    assert plan.actions[0].metadata["package"] == "kombu"
+    assert "kombu" in plan.actions[0].description
+
+    result = engine.apply_plan(plan, dry_run=False)
+    assert result.success
+    assert len(result.applied) == 1
+    updated = pyproject.read_text(encoding="utf-8")
+    assert '"kombu"' in updated
+    assert '"celery>=5.3"' in updated
+
+
 def test_remediation_apply_remove_dep_pyproject(tmp_path: Path):
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(

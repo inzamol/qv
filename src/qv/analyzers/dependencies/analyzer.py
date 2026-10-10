@@ -1,15 +1,18 @@
-"""Dependency analyzer implementing DEP-001, DEP-002, DEP-003, DEP-004, DEP-005."""
+"""Dependency analyzer implementing DEP-001, DEP-002, DEP-003, DEP-004, DEP-005, DEP-007."""
 
 from __future__ import annotations
 
 import sys
+from typing import Any
 
+from packaging.markers import default_environment
 from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
+from packaging.utils import canonicalize_name
 from packaging.version import Version
 
 from qv.core.config import canonicalize_dependency_name
-from qv.core.context import ProjectContext
+from qv.core.context import InstalledDistribution, ProjectContext
 from qv.core.models import Diagnostic, Evidence, Severity, Suggestion
 from qv.rules.registry import get_rule_definition
 
@@ -210,6 +213,7 @@ class DependencyAnalyzer:
         "DEP-003",
         "DEP-004",
         "DEP-005",
+        "DEP-007",
     )
 
     def analyze(self, context: ProjectContext) -> list[Diagnostic]:
@@ -290,11 +294,31 @@ class DependencyAnalyzer:
 
         return diagnostics
 
+    @staticmethod
+    def _evaluate_requirement_marker(
+        marker: Any, active_extras: set[str], base_env: dict[str, Any]
+    ) -> bool:
+        """Evaluate a PEP 508 requirement marker against the target environment and active extras."""
+        if not marker:
+            return True
+
+        extras_to_test = (active_extras | {""}) if active_extras else {""}
+        for ex in extras_to_test:
+            env = dict(base_env)
+            env["extra"] = ex
+            try:
+                if marker.evaluate(env):
+                    return True
+            except Exception:
+                pass
+        return False
+
     def _check_missing_dependencies(self, context: ProjectContext) -> list[Diagnostic]:
-        """DEP-002: Check for imported packages not declared in dependencies."""
+        """DEP-002 & DEP-007: Check for imported packages not declared in dependencies."""
         diagnostics: list[Diagnostic] = []
-        rule = get_rule_definition("DEP-002")
-        if not rule:
+        rule_missing = get_rule_definition("DEP-002")
+        rule_transitive = get_rule_definition("DEP-007")
+        if not rule_missing and not rule_transitive:
             return diagnostics
 
         declared_canonical_names = {
@@ -322,6 +346,81 @@ class DependencyAnalyzer:
         has_build_manifest = any(
             m.name in ("setup.py", "setup.cfg", "pyproject.toml") for m in context.manifest_files
         )
+
+        # Build canonical lookup for installed packages
+        installed_by_canon: dict[str, InstalledDistribution] = {}
+        for k, dist in context.installed_packages.items():
+            installed_by_canon[canonicalize_name(dist.name)] = dist
+            installed_by_canon[canonicalize_name(k)] = dist
+
+        base_env: dict[str, Any] = dict(default_environment())
+        if context.python_runtime:
+            rt = context.python_runtime
+            if rt.major is not None and rt.minor is not None:
+                base_env["python_version"] = f"{rt.major}.{rt.minor}"
+            if rt.version_str:
+                base_env["python_full_version"] = rt.version_str
+                base_env["implementation_version"] = rt.version_str
+
+        # Traverse the installed requirement graph starting from declared dependencies
+        # to map each transitively provided package to its declared provider.
+        # Only packages whose requirement markers evaluate to True in the target environment
+        # and that are confirmed installed are considered provided.
+        transitive_providers: dict[str, str] = {}
+        for dep in context.dependencies:
+            dep_canon = canonicalize_name(dep.name)
+            root_dist = (
+                installed_by_canon.get(dep_canon)
+                or context.installed_packages.get(dep.name.lower().replace("-", "_"))
+                or context.installed_packages.get(dep.name.lower())
+            )
+            if not root_dist:
+                continue
+
+            root_extras = set(dep.extras)
+            try:
+                root_extras.update(Requirement(dep.name).extras)
+            except Exception:
+                pass
+
+            visited_extras: dict[str, set[str]] = {dep_canon: root_extras}
+            queue: list[tuple[InstalledDistribution, set[str]]] = [(root_dist, root_extras)]
+
+            while queue:
+                curr_dist, active_extras = queue.pop(0)
+                for req_str in curr_dist.requires:
+                    try:
+                        req = Requirement(req_str)
+                    except Exception:
+                        continue
+
+                    if not self._evaluate_requirement_marker(req.marker, active_extras, base_env):
+                        continue
+
+                    req_name = req.name
+                    req_canon = canonicalize_name(req_name)
+
+                    # Confirm the provider supplies the package in the environment: it must be installed
+                    child_dist = (
+                        installed_by_canon.get(req_canon)
+                        or context.installed_packages.get(req_name.lower().replace("-", "_"))
+                        or context.installed_packages.get(req_name.lower())
+                    )
+                    if not child_dist:
+                        continue
+
+                    if req_canon not in transitive_providers:
+                        transitive_providers[req_canon] = dep.name
+                        transitive_providers[req_name.lower().replace("-", "_")] = dep.name
+                        transitive_providers[req_name.lower()] = dep.name
+
+                    child_extras = set(req.extras)
+                    if req_canon not in visited_extras:
+                        visited_extras[req_canon] = child_extras
+                        queue.append((child_dist, child_extras))
+                    elif not child_extras.issubset(visited_extras[req_canon]):
+                        visited_extras[req_canon].update(child_extras)
+                        queue.append((child_dist, child_extras))
 
         seen_missing: set[str] = set()
 
@@ -371,20 +470,17 @@ class DependencyAnalyzer:
 
                 # Check if this package is provided transitively by a declared dependency
                 transitive_provider: str | None = None
-                for dep in context.dependencies:
-                    dep_dist = context.installed_packages.get(
-                        dep.name.lower().replace("-", "_")
-                    ) or context.installed_packages.get(dep.name.lower())
-                    if dep_dist:
-                        for req_str in dep_dist.requires:
-                            try:
-                                req_name = Requirement(req_str).name.lower().replace("-", "_")
-                                if req_name in (top_level_norm, mapped_pkg):
-                                    transitive_provider = dep.name
-                                    break
-                            except Exception:
-                                pass
-                    if transitive_provider:
+                for key in (
+                    mapped_pkg_canon,
+                    top_level_canon,
+                    canonicalize_name(mapped_pkg),
+                    canonicalize_name(top_level),
+                    mapped_pkg,
+                    top_level_norm,
+                    top_level.lower(),
+                ):
+                    if key and key in transitive_providers:
+                        transitive_provider = transitive_providers[key]
                         break
 
                 evidence_list = [
@@ -406,14 +502,18 @@ class DependencyAnalyzer:
                 )
 
                 if transitive_provider:
-                    diag_severity = Severity.WARNING
+                    rule = rule_transitive
+                    diag_id = "DEP-007"
+                    diag_severity = rule.default_severity if rule else Severity.WARNING
                     diag_title = f"Undeclared transitive dependency: {top_level}"
                     diag_msg = (
                         f"Module '{top_level}' is imported in {rel_path}:{imp.line_number} and provided "
                         f"transitively by '{transitive_provider}', but is not declared directly in project dependencies."
                     )
                 else:
-                    diag_severity = Severity.ERROR
+                    rule = rule_missing
+                    diag_id = "DEP-002"
+                    diag_severity = rule.default_severity if rule else Severity.ERROR
                     diag_title = f"Missing dependency: {top_level}"
                     diag_msg = f"Module '{top_level}' is imported in {rel_path}:{imp.line_number} but is not declared in project dependencies."
 
@@ -425,9 +525,9 @@ class DependencyAnalyzer:
                     add_args = ["install", top_level]
 
                 diag = Diagnostic(
-                    id=rule.id,
+                    id=diag_id,
                     severity=diag_severity,
-                    category=rule.category,
+                    category=rule.category if rule else "dependency",
                     title=diag_title,
                     message=diag_msg,
                     evidence=evidence_list,
@@ -442,7 +542,7 @@ class DependencyAnalyzer:
                     affected_packages=[top_level],
                     file=str(rel_path),
                     line=imp.line_number,
-                    doc_url=rule.doc_url,
+                    doc_url=rule.doc_url if rule else None,
                 )
                 diagnostics.append(diag)
 
