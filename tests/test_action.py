@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -14,13 +16,16 @@ FIXTURE_PROJECT = REPO_ROOT / "tests" / "fixtures" / "action-project"
 FIXTURE_CLEAN = REPO_ROOT / "tests" / "fixtures" / "action-project-clean"
 
 
-def run_action_script(extra_env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def run_action_script(
+    extra_env: dict[str, str], cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
     """Execute action runner with current environment and UTF-8 encoding."""
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
     env.update(extra_env)
     return subprocess.run(
         [sys.executable, str(ACTION_RUNNER)],
+        cwd=cwd,
         env=env,
         capture_output=True,
         text=True,
@@ -418,3 +423,123 @@ def test_action_cleans_stale_report_on_failure(tmp_path: Path):
         out_content = github_output.read_text(encoding="utf-8")
         assert "sarif-file=\n" in out_content or "sarif-file=" not in out_content
         assert "findings=0" in out_content
+
+
+def test_documented_github_action_example_integration(tmp_path: Path):
+    """Verify README's documented GitHub Action workflow uses supported inputs and runs successfully."""
+    readme_path = REPO_ROOT / "README.md"
+    assert readme_path.exists(), "README.md must exist"
+    readme_content = readme_path.read_text(encoding="utf-8")
+
+    # 1. Extract the YAML snippet under '### Official GitHub Action'
+    assert "### Official GitHub Action" in readme_content
+    section = readme_content.split("### Official GitHub Action")[1].split("###")[0]
+    match = re.search(r"```yaml\s*\n(.*?)```", section, re.DOTALL)
+    assert match is not None, (
+        "Could not find YAML code block under '### Official GitHub Action' in README.md"
+    )
+    yaml_text = match.group(1)
+    assert "uses: inzamol/qv" in yaml_text, (
+        "Documented workflow must contain a step using 'inzamol/qv'"
+    )
+
+    # 2. Extract 'with:' parameters for inzamol/qv step
+    with_match = re.search(
+        r"uses:\s*inzamol/qv[^\n]*\n\s*with:\s*\n((?:\s+[a-zA-Z0-9_-]+:\s*[^\n]+\n?)+)",
+        yaml_text,
+    )
+    assert with_match, "Could not find 'with:' block for inzamol/qv step"
+
+    step_with: dict[str, str | bool] = {}
+    for line in with_match.group(1).splitlines():
+        line = line.strip()
+        if line and ":" in line:
+            k, v = line.split(":", 1)
+            v = v.strip()
+            if v.lower() == "true":
+                step_with[k.strip()] = True
+            elif v.lower() == "false":
+                step_with[k.strip()] = False
+            else:
+                step_with[k.strip()] = v
+
+    # 3. Verify inputs against action.yml specification
+    action_yml_path = REPO_ROOT / "action.yml"
+    assert action_yml_path.exists()
+    action_yml_content = action_yml_path.read_text(encoding="utf-8")
+    inputs_block = action_yml_content.split("inputs:\n", 1)[1].split("outputs:\n", 1)[0]
+    declared_inputs = set(re.findall(r"^  ([a-zA-Z0-9_-]+):", inputs_block, re.MULTILINE))
+
+    # None of the obsolete inputs should be present
+    obsolete_inputs = {"strict", "html_report", "sarif_report", "github_annotations"}
+    for obsolete in obsolete_inputs:
+        assert obsolete not in step_with, (
+            f"Obsolete input '{obsolete}' found in documented action example"
+        )
+
+    # All documented inputs must be declared in action.yml
+    for documented_input in step_with:
+        assert documented_input in declared_inputs, (
+            f"Documented input '{documented_input}' is not declared in action.yml inputs: {declared_inputs}"
+        )
+
+    # Expected supported inputs in the documented example
+    assert step_with.get("format") == "sarif"
+    assert step_with.get("output") == "qv-results.sarif"
+    assert step_with.get("fail-on") == "error"
+    assert step_with.get("github-annotations") is True
+
+    # 4. Integration execution against clean project (should succeed)
+    clean_project_dir = tmp_path / "clean_project"
+    shutil.copytree(FIXTURE_CLEAN, clean_project_dir)
+
+    extra_env = {f"INPUT_{k.upper().replace('-', '_')}": str(v) for k, v in step_with.items()}
+    github_output_clean = tmp_path / "github_output_clean.txt"
+    extra_env["GITHUB_OUTPUT"] = str(github_output_clean)
+    extra_env["INPUT_OFFLINE"] = "true"
+
+    # Execute in clean project root using default relative path '.'
+    res_clean = run_action_script(extra_env, cwd=clean_project_dir)
+    assert res_clean.returncode == 0, (
+        f"Clean run failed: stdout={res_clean.stdout}\nstderr={res_clean.stderr}"
+    )
+    assert "qv found 0 errors." in res_clean.stdout
+
+    output_rel = str(step_with["output"])
+    expected_output_file = clean_project_dir / output_rel
+    assert expected_output_file.is_file(), (
+        f"Expected SARIF report not found at {expected_output_file}"
+    )
+
+    sarif_data = json.loads(expected_output_file.read_text(encoding="utf-8"))
+    assert sarif_data["version"] == "2.1.0"
+    assert len(sarif_data["runs"][0]["results"]) == 0
+
+    assert github_output_clean.exists()
+    out_clean_content = github_output_clean.read_text(encoding="utf-8")
+    assert "errors=0" in out_clean_content
+    assert "exit-code=0" in out_clean_content
+
+    # 5. Integration execution against project with error findings (should fail with code 1)
+    findings_project_dir = tmp_path / "findings_project"
+    shutil.copytree(FIXTURE_PROJECT, findings_project_dir)
+
+    github_output_findings = tmp_path / "github_output_findings.txt"
+    extra_env["GITHUB_OUTPUT"] = str(github_output_findings)
+
+    res_findings = run_action_script(extra_env, cwd=findings_project_dir)
+    assert res_findings.returncode == 1, (
+        "Expected action to fail with exit code 1 for project with errors"
+    )
+    assert "::error" in res_findings.stdout or "::error" in res_findings.stderr
+    assert "qv found 2 error(s)." in res_findings.stdout
+
+    findings_sarif = findings_project_dir / output_rel
+    assert findings_sarif.is_file()
+    findings_data = json.loads(findings_sarif.read_text(encoding="utf-8"))
+    assert len(findings_data["runs"][0]["results"]) == 3
+
+    assert github_output_findings.exists()
+    out_findings_content = github_output_findings.read_text(encoding="utf-8")
+    assert "errors=2" in out_findings_content
+    assert "exit-code=1" in out_findings_content
