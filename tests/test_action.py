@@ -49,18 +49,22 @@ def test_action_yml_exists_and_valid():
     assert "python-qv" in content
 
 
-def test_action_yml_latest_version_resolution_timeout_and_warning():
-    """Verify action.yml configures a timeout on urlopen and emits ::warning:: on PyPI failure."""
+def test_action_yml_latest_version_resolution_timeout_and_error():
+    """Verify action.yml configures timeout, captures stderr separately, emits ::error:: with diagnostics, and cleans up."""
     action_yml = REPO_ROOT / "action.yml"
     content = action_yml.read_text(encoding="utf-8")
 
     assert "urllib.request.urlopen('https://pypi.org/pypi/python-qv/json', timeout=" in content
-    assert "::warning::" in content
-    assert 'RESOLVED_VER="1.0.1"' in content
+    assert "::error::Failed to resolve latest python-qv version from PyPI" in content
+    assert "Installed python-qv version:" in content
+    assert "RESOLVE_ERR_FILE=$(mktemp)" in content
+    assert '2>"$RESOLVE_ERR_FILE"' in content
+    assert 'cat "$RESOLVE_ERR_FILE" >&2' in content
+    assert 'rm -f "$RESOLVE_ERR_FILE"' in content
 
 
-def test_action_latest_fallback_emits_warning_on_failure(tmp_path: Path):
-    """Verify that when PyPI lookup fails for 'latest', a warning is emitted and 1.0.1 fallback used."""
+def test_action_latest_resolution_fails_clearly_on_error(tmp_path: Path):
+    """Verify that when PyPI lookup fails for 'latest', an error and captured diagnostics are emitted, temp file is cleaned up, and execution exits 1."""
     import shutil
 
     import pytest
@@ -76,27 +80,65 @@ def test_action_latest_fallback_emits_warning_on_failure(tmp_path: Path):
     if not bash:
         pytest.skip("bash executable not found")
 
-    test_sh = tmp_path / "test_install.sh"
+    test_sh = tmp_path / "test_install_fail.sh"
+    err_file = tmp_path / "resolve_err.log"
     test_sh.write_text(
-        """#!/usr/bin/env bash
-set -e
+        f"""#!/usr/bin/env bash
 INPUT_VERSION="latest"
 if [ "$INPUT_VERSION" = "latest" ]; then
-  RESOLVED_VER=$(python -c "import urllib.request, json; print(json.loads(urllib.request.urlopen('https://invalid.example.nonexistent/json', timeout=1).read())['info']['version'])" 2>/dev/null || true)
+  RESOLVE_ERR_FILE="{err_file.as_posix()}"
+  RESOLVED_VER=$(python -c "import urllib.request, json; print(json.loads(urllib.request.urlopen('https://invalid.example.nonexistent/json', timeout=1).read())['info']['version'])" 2>"$RESOLVE_ERR_FILE" || true)
   if [ -z "$RESOLVED_VER" ]; then
-    echo "::warning::Failed to resolve latest python-qv version from PyPI; falling back to 1.0.1"
-    RESOLVED_VER="1.0.1"
+    echo "::error::Failed to resolve latest python-qv version from PyPI. Please specify an explicit version (e.g. version: '1.0.1') or check network connectivity." >&2
+    if [ -s "$RESOLVE_ERR_FILE" ]; then
+      cat "$RESOLVE_ERR_FILE" >&2
+    fi
+    rm -f "$RESOLVE_ERR_FILE"
+    exit 1
   fi
+  rm -f "$RESOLVE_ERR_FILE"
 fi
-echo "FINAL_VERSION=$RESOLVED_VER"
+""",
+        encoding="utf-8",
+    )
+
+    res = subprocess.run([bash, str(test_sh)], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert "::error::Failed to resolve latest python-qv version from PyPI" in res.stderr
+    assert "URLError" in res.stderr or "urlopen error" in res.stderr or "getaddrinfo" in res.stderr
+    assert not err_file.exists(), "Temporary error file must be cleaned up on failure"
+
+
+def test_action_prints_installed_version_on_install(tmp_path: Path):
+    """Verify that action install script prints the exact installed version."""
+    import shutil
+
+    import pytest
+
+    git_bash = Path(r"C:\Program Files\Git\bin\bash.exe")
+    if sys.platform == "win32" and git_bash.exists():
+        bash = str(git_bash)
+    else:
+        bash = shutil.which("bash")
+        if sys.platform == "win32" and bash and "system32" in bash.lower():
+            pytest.skip("WSL bash on Windows cannot directly execute Windows temp paths")
+
+    if not bash:
+        pytest.skip("bash executable not found")
+
+    test_sh = tmp_path / "test_install_print.sh"
+    test_sh.write_text(
+        """#!/usr/bin/env bash
+INPUT_VERSION="1.0.1"
+TARGET_VER="${INPUT_VERSION:-1.0.1}"
+echo "Installed python-qv version: $TARGET_VER"
 """,
         encoding="utf-8",
     )
 
     res = subprocess.run([bash, str(test_sh)], capture_output=True, text=True)
     assert res.returncode == 0
-    assert "::warning::" in res.stdout
-    assert "FINAL_VERSION=1.0.1" in res.stdout
+    assert "Installed python-qv version: 1.0.1" in res.stdout
 
 
 def test_action_yml_local_version_requires_src_directory():

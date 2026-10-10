@@ -106,7 +106,7 @@ jobs:
 | `baseline` | Path to baseline snapshot to ignore existing findings | `""` |
 | `args` | Additional CLI arguments to pass to `qv scan` | `""` |
 
-> **Tip (Reproducible Builds)**: For deterministic production workflows, pin the GitHub Action with a full commit SHA in `uses:` (e.g. `uses: inzamol/qv@<commit-sha>`) and pin the `python-qv` package using the `version` input (e.g. `version: "1.0.1"`), rather than floating on `latest`.
+> **Tip (Reproducible Builds)**: For deterministic production workflows, pin the GitHub Action with a full commit SHA in `uses:` (e.g. `uses: inzamol/qv@<commit-sha>`) and pin the `python-qv` package using the `version` input (e.g. `version: "1.0.1"`), rather than floating on `latest`. When `version: latest` is requested, the action resolves the newest release from PyPI and fails clearly if network resolution is unavailable.
 
 ### Action Outputs
 
