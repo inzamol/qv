@@ -42,7 +42,7 @@ jobs:
 | Input | Description | Default |
 |---|---|---|
 | `path` | Path to the Python project directory to analyze | `.` |
-| `version` | Version of `python-qv` to use (`latest`, specific version like `1.0.1`, or `local`) | `latest` |
+| `version` | Version of `python-qv` to use (pinned version like `1.0.1`, `latest`, or `local`) | `1.0.1` |
 | `python-version` | Python version used to run qv (`3.10`, `3.11`, `3.12`, `3.13`) | `3.12` |
 | `format` | Output report format (`sarif`, `terminal`, `json`, `html`, `text`) | `sarif` |
 | `output` | Output file path for generated report | `qv-results.sarif` |
@@ -51,6 +51,8 @@ jobs:
 | `offline` | Disable remote vulnerability queries (airgapped mode) | `false` |
 | `baseline` | Path to baseline snapshot to ignore existing findings | `""` |
 | `args` | Additional CLI arguments to pass to `qv scan` | `""` |
+
+> **Tip (Reproducible Builds)**: For deterministic production workflows, pin the GitHub Action with a full commit SHA in `uses:` (e.g. `uses: inzamol/qv@<commit-sha>`) and pin the `python-qv` package using the `version` input (e.g. `version: "1.0.1"`), rather than floating on `latest`.
 
 ### 1.2 Action Outputs
 

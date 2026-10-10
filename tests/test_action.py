@@ -543,3 +543,56 @@ def test_documented_github_action_example_integration(tmp_path: Path):
     out_findings_content = github_output_findings.read_text(encoding="utf-8")
     assert "errors=2" in out_findings_content
     assert "exit-code=1" in out_findings_content
+
+
+def test_action_version_default_consistency():
+    """Verify that action.yml, README.md, and docs/ci_integration.md have synchronized version defaults."""
+    action_yml = REPO_ROOT / "action.yml"
+    readme_md = REPO_ROOT / "README.md"
+    docs_md = REPO_ROOT / "docs" / "ci_integration.md"
+
+    assert action_yml.exists()
+    assert readme_md.exists()
+    assert docs_md.exists()
+
+    action_content = action_yml.read_text(encoding="utf-8")
+    readme_content = readme_md.read_text(encoding="utf-8")
+    docs_content = docs_md.read_text(encoding="utf-8")
+
+    # Extract version default from action.yml
+    action_match = re.search(
+        r"version:\s*\n(?:\s+[^\n]+\n)*?\s+default:\s*[\"']?([^\"'\s]+)[\"']?",
+        action_content,
+    )
+    assert action_match is not None, "Could not find version default in action.yml"
+    action_default = action_match.group(1)
+
+    # Extract version default from README.md action configuration table
+    readme_match = re.search(
+        r"\|\s*`version`\s*\|[^|]+\|\s*`?([^`|\s]+)`?\s*\|",
+        readme_content,
+    )
+    assert readme_match is not None, "Could not find `version` row in README.md"
+    readme_default = readme_match.group(1)
+
+    # Extract version default from docs/ci_integration.md action inputs table
+    docs_match = re.search(
+        r"\|\s*`version`\s*\|[^|]+\|\s*`?([^`|\s]+)`?\s*\|",
+        docs_content,
+    )
+    assert docs_match is not None, "Could not find `version` row in docs/ci_integration.md"
+    docs_default = docs_match.group(1)
+
+    assert action_default == "1.0.1", (
+        f"action.yml default version should be 1.0.1, got {action_default}"
+    )
+    assert readme_default == action_default, (
+        f"README.md version default ({readme_default}) does not match action.yml ({action_default})"
+    )
+    assert docs_default == action_default, (
+        f"docs/ci_integration.md version default ({docs_default}) does not match action.yml ({action_default})"
+    )
+
+    # Verify reproducible builds guidance is present in docs
+    assert "Tip (Reproducible Builds)" in readme_content
+    assert "Tip (Reproducible Builds)" in docs_content
