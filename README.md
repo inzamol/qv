@@ -748,10 +748,10 @@ jobs:
       - name: Run qv Health Scan
         uses: inzamol/qv@v1
         with:
-          strict: true
-          html_report: report.html
-          sarif_report: qv.sarif
-          github_annotations: true
+          format: sarif
+          output: qv-results.sarif
+          fail-on: error
+          github-annotations: true
 ```
 
 ### GitHub Actions (Manual setup with SARIF code scanning)
